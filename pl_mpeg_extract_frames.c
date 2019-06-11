@@ -27,7 +27,7 @@ SOFTWARE.
 
 -- Usage
 
-plmpeg-extract-frames <video-file.mpg>
+pl_mpeg_extract_frames <video-file.mpg>
 
 
 -- About
@@ -51,27 +51,27 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	plm_t *mpeg = plm_create_with_filename(argv[1]);
-	if (!mpeg) {
+	plm_t *plm = plm_create_with_filename(argv[1]);
+	if (!plm) {
 		printf("Couldn't open file");
 		return 1;
 	}
 
-	plm_set_audio_enabled(mpeg, FALSE, 0);
+	plm_set_audio_enabled(plm, FALSE, 0);
 	
-	int w = plm_get_width(mpeg);
-	int h = plm_get_height(mpeg);
-	uint8_t *rgb = (uint8_t *)malloc(w * h * 3);
+	int w = plm_get_width(plm);
+	int h = plm_get_height(plm);
+	uint8_t *rgb_buffer = (uint8_t *)malloc(w * h * 3);
 	
 	char png_name[16];
-	plm_frame_t *f = NULL;
+	plm_frame_t *frame = NULL;
 
-	for (int i = 0; f = plm_decode_video(mpeg); i++) {
-		plm_frame_to_rgb(f, rgb);
+	for (int i = 0; frame = plm_decode_video(plm); i++) {
+		plm_frame_to_rgb(frame, rgb_buffer);
 		
 		sprintf(png_name, "%04d.png", i);
 		printf("Writing %s\n", png_name);
-		stbi_write_png(png_name, w, h, 3, rgb, w*3);
+		stbi_write_png(png_name, w, h, 3, rgb_buffer, w * 3);
 	}
 	
     return 0;
