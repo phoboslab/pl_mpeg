@@ -5,6 +5,20 @@ Single-file MIT licensed library for C/C++
 See [pl_mpeg.h](https://github.com/phoboslab/pl_mpeg/blob/master/pl_mpeg.h) for
 the documentation.
 
+## Why?
+
+This is meant as a simple way to get video playback into your app or game. Other
+solutions, such as ffmpeg require huge libraries and a lot of glue code.
+
+MPEG1 is an old and inefficient codec, but it's still good enough for many use
+cases. All patents related to MPEG1 and MP2 have expired, so it's completely
+free now.
+
+This library does not make use of any SIMD instructions, but because of
+the relative simplicity of the codec it still manages to decode 4k60fps video
+on a single CPU core (on my i7-6700k at least).
+
+
 ## Example Usage
 
 - [pl_mpeg_extract_frames.c](https://github.com/phoboslab/pl_mpeg/blob/master/pl_mpeg_extract_frames.c)
@@ -21,7 +35,7 @@ containing MPEG1 Video ("mpeg1") and MPEG1 Audio Layer II ("mp2") streams should
 work with PL_MPEG. Note that `.mpg` files can also contain MPEG2 Video, which is
 not supported by this library.
 
-You can encode a video in a suitable format using ffmpeg:
+You can encode video in a suitable format using ffmpeg:
 
 ```
 ffmpeg -i input.mp4 -c:v mpeg1video -c:a mp2 -format mpeg output.mpg
