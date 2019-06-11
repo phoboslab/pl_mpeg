@@ -5,6 +5,7 @@ Single-file MIT licensed library for C/C++
 See [pl_mpeg.h](https://github.com/phoboslab/pl_mpeg/blob/master/pl_mpeg.h) for
 the documentation.
 
+
 ## Why?
 
 This is meant as a simple way to get video playback into your app or game. Other
@@ -40,6 +41,11 @@ You can encode video in a suitable format using ffmpeg:
 ```
 ffmpeg -i input.mp4 -c:v mpeg1video -c:a mp2 -format mpeg output.mpg
 ```
+
+If you just want to quickly test the library, try this file:
+
+https://phoboslab.org/files/bjork-all-is-full-of-love.mpg
+
 
 ## Limitations
 
