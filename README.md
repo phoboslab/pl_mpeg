@@ -7,9 +7,9 @@ the documentation.
 
 ## Example Usage
 
-- [pl_mpeg_extract_frames.c](https://github.com/phoboslab/plmpeg/blob/master/pl_mpeg_extract_frames.c)
+- [pl_mpeg_extract_frames.c](https://github.com/phoboslab/pl_mpeg/blob/master/pl_mpeg_extract_frames.c)
 extracts all frames from a video and saves them as PNG.
- - [pl_mpeg_player.c](https://github.com/phoboslab/plmpeg/blob/master/pl_mpeg_player.c)
+ - [pl_mpeg_player.c](https://github.com/phoboslab/pl_mpeg/blob/master/pl_mpeg_player.c)
 implements a video player using SDL2 and OpenGL for rendering.
 
 
