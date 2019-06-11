@@ -61,19 +61,19 @@ steps combined.
 	}
 #else
 	// WINDOWS
-    #include <windows.h>
+	#include <windows.h>
 
-    #define GL3_PROTOTYPES 1
-    #include <glew.h>
-    #pragma comment(lib, "glew32.lib")
+	#define GL3_PROTOTYPES 1
+	#include <glew.h>
+	#pragma comment(lib, "glew32.lib")
 
-    #include <gl/GL.h>
-    #pragma comment(lib, "opengl32.lib")
+	#include <gl/GL.h>
+	#pragma comment(lib, "opengl32.lib")
 
-    #include <SDL.h>
-    #include <SDL_opengl.h>
-    #pragma comment(lib, "SDL2.lib")
-    #pragma comment(lib, "SDL2main.lib")
+	#include <SDL.h>
+	#include <SDL_opengl.h>
+	#pragma comment(lib, "SDL2.lib")
+	#pragma comment(lib, "SDL2main.lib")
 #endif
 
 #define PL_MPEG_IMPLEMENTATION
@@ -83,13 +83,13 @@ steps combined.
 #define APP_SHADER_SOURCE(...) #__VA_ARGS__;
 
 const char * const APP_VERTEX_SHADER = APP_SHADER_SOURCE(
-    attribute vec2 vertex;
-    varying vec2 tex_coord;
-    
-    void main() {
-        tex_coord = vertex;
-        gl_Position = vec4((vertex * 2.0 - 1.0) * vec2(1, -1), 0.0, 1.0);
-    }
+	attribute vec2 vertex;
+	varying vec2 tex_coord;
+	
+	void main() {
+		tex_coord = vertex;
+		gl_Position = vec4((vertex * 2.0 - 1.0) * vec2(1, -1), 0.0, 1.0);
+	}
 );
 
 const char * const APP_FRAGMENT_SHADER_YCRCB = APP_SHADER_SOURCE(
@@ -104,7 +104,7 @@ const char * const APP_FRAGMENT_SHADER_YCRCB = APP_SHADER_SOURCE(
 		1.16438,  2.01723,  0.00000, -1.08139,
 		0, 0, 0, 1
 	);
-      
+	  
 	void main() {
 		float y = texture2D(texture_y, tex_coord).r;
 		float cb = texture2D(texture_cb, tex_coord).r;
@@ -186,10 +186,10 @@ app_t * app_create(const char *filename, int texture_mode) {
 		plm_get_samplerate(self->plm)
 	);
 	
-    plm_set_video_decode_callback(self->plm, app_on_video, self);
-    plm_set_audio_decode_callback(self->plm, app_on_audio, self);
+	plm_set_video_decode_callback(self->plm, app_on_video, self);
+	plm_set_audio_decode_callback(self->plm, app_on_audio, self);
 	
-    plm_set_loop(self->plm, TRUE);
+	plm_set_loop(self->plm, TRUE);
 	plm_set_audio_enabled(self->plm, TRUE, 0);
 
 	if (plm_get_num_audio_streams(self->plm) > 0) {
@@ -213,15 +213,15 @@ app_t * app_create(const char *filename, int texture_mode) {
 	}
 	
 	// Create SDL Window
-    self->window = SDL_CreateWindow(
-    	"pl_mpeg",
+	self->window = SDL_CreateWindow(
+		"pl_mpeg",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		plm_get_width(self->plm), plm_get_height(self->plm),
 		SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
 	);
-    self->gl = SDL_GL_CreateContext(self->window);
+	self->gl = SDL_GL_CreateContext(self->window);
 	
-    SDL_GL_SetSwapInterval(1);
+	SDL_GL_SetSwapInterval(1);
 
 	#if defined(__APPLE__) && defined(__MACH__)
 		// OSX
@@ -234,24 +234,24 @@ app_t * app_create(const char *filename, int texture_mode) {
 	
 	
 	// Setup OpenGL shaders and textures
-    const char * fsh = self->texture_mode == APP_TEXTURE_MODE_YCRCB
-    	? APP_FRAGMENT_SHADER_YCRCB
-    	: APP_FRAGMENT_SHADER_RGB;
+	const char * fsh = self->texture_mode == APP_TEXTURE_MODE_YCRCB
+		? APP_FRAGMENT_SHADER_YCRCB
+		: APP_FRAGMENT_SHADER_RGB;
 	
-    self->fragment_shader = app_compile_shader(self, GL_FRAGMENT_SHADER, fsh);
-    self->vertex_shader = app_compile_shader(self, GL_VERTEX_SHADER, APP_VERTEX_SHADER);
+	self->fragment_shader = app_compile_shader(self, GL_FRAGMENT_SHADER, fsh);
+	self->vertex_shader = app_compile_shader(self, GL_VERTEX_SHADER, APP_VERTEX_SHADER);
 	
-    self->shader_program = glCreateProgram();
-    glAttachShader(self->shader_program, self->vertex_shader);
-    glAttachShader(self->shader_program, self->fragment_shader);
-    glLinkProgram(self->shader_program);
-    glUseProgram(self->shader_program);
+	self->shader_program = glCreateProgram();
+	glAttachShader(self->shader_program, self->vertex_shader);
+	glAttachShader(self->shader_program, self->fragment_shader);
+	glLinkProgram(self->shader_program);
+	glUseProgram(self->shader_program);
 	
 	// Create textures for YCrCb or RGB rendering
 	if (self->texture_mode == APP_TEXTURE_MODE_YCRCB) {
 		self->texture_y  = app_create_texture(self, 0, "texture_y");
-    	self->texture_cb = app_create_texture(self, 1, "texture_cb");
-    	self->texture_cr = app_create_texture(self, 2, "texture_cr");
+		self->texture_cb = app_create_texture(self, 1, "texture_cb");
+		self->texture_cr = app_create_texture(self, 2, "texture_cr");
 	}
 	else {
 		self->texture_rgb = app_create_texture(self, 0, "texture_rgb");
@@ -259,7 +259,7 @@ app_t * app_create(const char *filename, int texture_mode) {
 		self->rgb_data = (uint8_t*)malloc(num_pixels * 3);
 	}
 	
-    return self;
+	return self;
 }
 
 void app_destroy(app_t *self) {
@@ -274,9 +274,9 @@ void app_destroy(app_t *self) {
 	}
 	
 	SDL_GL_DeleteContext(self->gl);
-    SDL_Quit();
+	SDL_Quit();
 	
-    free(self);
+	free(self);
 }
 
 double audio_lead = 0;
@@ -312,42 +312,42 @@ void app_update(app_t *self) {
 }
 
 GLuint app_compile_shader(app_t *self, GLenum type, const char *source) {
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &source, NULL);
-    glCompileShader(shader);
-    
-    GLint success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-    	int log_written;
+	GLuint shader = glCreateShader(type);
+	glShaderSource(shader, 1, &source, NULL);
+	glCompileShader(shader);
+	
+	GLint success;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		int log_written;
 		char log[256];
 		glGetShaderInfoLog(shader, 256, &log_written, log);
 		SDL_Log("Error compiling shader: %s.\n", log);
-    }
-    return shader;
+	}
+	return shader;
 }
 
 GLuint app_create_texture(app_t *self, GLuint index, const char *name) {
-    GLuint texture;
-    glCreateTextures(GL_TEXTURE_2D, 1, &texture);
-    
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
-    glUniform1i(glGetUniformLocation(self->shader_program, name), index);
-    return texture;
+	GLuint texture;
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+	
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	
+	glUniform1i(glGetUniformLocation(self->shader_program, name), index);
+	return texture;
 }
 
 void app_update_texture(app_t *self, GLuint unit, GLuint texture, plm_plane_t *plane) {
-    glActiveTexture(unit);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(
+	glActiveTexture(unit);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexImage2D(
 		GL_TEXTURE_2D, 0, GL_LUMINANCE, plane->width, plane->height, 0,
 		GL_LUMINANCE, GL_UNSIGNED_BYTE, plane->data
-    );
+	);
 }
 
 void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
@@ -356,10 +356,10 @@ void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
 	// Hand the decoded data over to OpenGL. For the RGB texture mode, the
 	// YCrCb->RGB conversion is done on the CPU.
 
-    if (self->texture_mode == APP_TEXTURE_MODE_YCRCB) {
+	if (self->texture_mode == APP_TEXTURE_MODE_YCRCB) {
 		app_update_texture(self, GL_TEXTURE0, self->texture_y, &frame->y);
-    	app_update_texture(self, GL_TEXTURE1, self->texture_cb, &frame->cb);
-    	app_update_texture(self, GL_TEXTURE2, self->texture_cr, &frame->cr);
+		app_update_texture(self, GL_TEXTURE1, self->texture_cb, &frame->cb);
+		app_update_texture(self, GL_TEXTURE2, self->texture_cr, &frame->cr);
 	}
 	else {
 		plm_frame_to_rgb(frame, self->rgb_data);
@@ -373,12 +373,12 @@ void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
 }
 
 void app_on_audio(plm_t *mpeg, plm_samples_t *samples, void *user) {
-    app_t *self = (app_t *)user;
+	app_t *self = (app_t *)user;
 
 	// Hand the decoded samples over to SDL
 	
-    int size = sizeof(float) * samples->count * 2;
-    SDL_QueueAudio(self->audio_device, samples->interleaved, size);
+	int size = sizeof(float) * samples->count * 2;
+	SDL_QueueAudio(self->audio_device, samples->interleaved, size);
 }
 
 
@@ -395,5 +395,5 @@ int main(int argc, char *argv[]) {
 	}
 	app_destroy(app);
 	
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
