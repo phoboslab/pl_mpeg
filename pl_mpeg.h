@@ -1272,7 +1272,10 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self) {
 			code == PLM_DEMUX_PACKET_PRIVATE || 
 			(code >= PLM_DEMUX_PACKET_AUDIO_1 && code <= PLM_DEMUX_PACKET_AUDIO_4)
 		) {
-			return plm_demux_decode_packet(self, code);
+			plm_packet_t *packet = plm_demux_decode_packet(self, code);
+			if (packet) {
+				return packet;
+			}
 		}
 	} while (code != -1);
 
