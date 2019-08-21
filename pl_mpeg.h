@@ -1948,6 +1948,11 @@ void plm_video_decode_sequence_header(plm_video_t *self) {
 	self->width = plm_buffer_read(self->buffer, 12);
 	self->height = plm_buffer_read(self->buffer, 12);
 
+	if (self->width <= 0 || self->height <= 0) {
+		// invalid video size
+		return;
+	}
+
 	// skip pixel aspect ratio
 	plm_buffer_skip(self->buffer, 4);
 
