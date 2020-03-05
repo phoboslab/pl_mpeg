@@ -1,0 +1,3 @@
+# Ensure GitHub detects files as C rather than Objective-C.
+*.c linguist-language=C
+*.h linguist-language=C
