@@ -59,6 +59,10 @@ steps combined.
 	void glCreateTextures(GLuint ignored, GLsizei n, GLuint *name) {
 		glGenTextures(1, name);
 	}
+#elif defined(__unix__)
+	// Linux
+	#include <SDL2/SDL.h>
+	#include <GL/glew.h>
 #else
 	// WINDOWS
 	#include <windows.h>
@@ -131,7 +135,7 @@ const char * const APP_FRAGMENT_SHADER_RGB = APP_SHADER_SOURCE(
 typedef struct {
 	plm_t *plm;
 	double last_time;
-	bool wants_to_quit;
+	int wants_to_quit;
 	
 	SDL_Window *window;
 	SDL_AudioDeviceID audio_device;
@@ -227,7 +231,7 @@ app_t * app_create(const char *filename, int texture_mode) {
 		// OSX
 		// (nothing to do here)
 	#else
-		// Windows
+		// Windows, Linux
 		glewExperimental = GL_TRUE;
 		glewInit();
 	#endif
@@ -286,7 +290,7 @@ void app_update(app_t *self) {
 			ev.type == SDL_QUIT || 
 			(ev.type == SDL_KEYUP && ev.key.keysym.sym == SDLK_ESCAPE)
 		) {
-			self->wants_to_quit = true;
+			self->wants_to_quit = TRUE;
 		}
 		
 		if (
@@ -300,14 +304,17 @@ void app_update(app_t *self) {
 	// Compute the delta time since the last app_update(), limit max step to 
 	// 1/30th of a second
 	double current_time = (double)SDL_GetTicks() / 1000.0;
-	double elapsed_time = min(current_time - self->last_time, 1.0 / 30.0);
+	double elapsed_time = current_time - self->last_time;
+	if (elapsed_time > 1.0 / 30.0) {
+		elapsed_time = 1.0 / 30.0;
+	}
 	self->last_time = current_time;
 	
 	// Decode
 	plm_decode(self->plm, elapsed_time);
 	
 	if (plm_has_ended(self->plm)) {
-		self->wants_to_quit = true;
+		self->wants_to_quit = TRUE;
 	}
 	
 	glClear(GL_COLOR_BUFFER_BIT);
