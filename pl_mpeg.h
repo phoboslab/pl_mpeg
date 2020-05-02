@@ -76,7 +76,7 @@ Interfaces are written in an object orientet style, meaning you create object
 instances via various different constructor functions (plm_*create()),
 do some work on them and later dispose them via plm_*destroy().
 
-plm_*		-- the high-level interface, combining demuxer and decoders
+plm_*        -- the high-level interface, combining demuxer and decoders
 plm_buffer_* -- the data source used by all interfaces
 plm_demux_*  -- the MPEG-PS demuxer
 plm_video_*  -- the MPEG1 Video ("mpeg1") decoder
@@ -84,7 +84,7 @@ plm_audio_*  -- the MPEG1 Audio Layer II ("mp2") decoder
 
 
 This library uses malloc(), realloc() and free() to manage memory. Typically 
-all allocation happens up-front when creating the interface. However, the
+all allocation happen up-front when creating the interface. However, the
 default buffer size may be too small for certain inputs. In these cases plmpeg
 will realloc() the buffer with a larger size whenever needed. You can configure
 the default buffer size by defining PLM_BUFFER_DEFAULT_SIZE *before* 
@@ -153,8 +153,8 @@ typedef struct plm_audio_t plm_audio_t;
 
 // Demuxed MPEG PS packet
 // The type maps directly to the various MPEG-PES start codes. pts is the
-// presentation time stamp of the packet in seconds. Not all packets have
-// a pts value.
+// presentation time stamp of the packet in seconds. Note that not all packets
+// have a pts value.
 
 typedef struct {
 	int type;
@@ -345,16 +345,16 @@ void plm_set_audio_decode_callback(plm_t *self, plm_audio_decode_callback fp, vo
 
 
 // Advance the internal timer by seconds and decode video/audio up to
-// this time. Returns TRUE/FALSE whether anything was decoded.
+// this time.
 
-int plm_decode(plm_t *self, double seconds);
+void plm_decode(plm_t *self, double seconds);
 
 
 // Decode and return one video frame. Returns NULL if no frame could be decoded
 // (either because the source ended or data is corrupt). If you only want to 
 // decode video, you should disable audio via plm_set_audio_enabled().
-// The returned plm_frame_t is valid until the next call to 
-// plm_decode_video call or until the plm_destroy is called.
+// The returned plm_frame_t is valid until the next call to plm_decode_video() 
+// or until plm_destroy() is called.
 
 plm_frame_t *plm_decode_video(plm_t *self);
 
@@ -362,8 +362,8 @@ plm_frame_t *plm_decode_video(plm_t *self);
 // Decode and return one audio frame. Returns NULL if no frame could be decoded
 // (either because the source ended or data is corrupt). If you only want to 
 // decode audio, you should disable video via plm_set_video_enabled().
-// The returned plm_samples_t is valid until the next call to 
-// plm_decode_video or until the plm_destroy is called.
+// The returned plm_samples_t is valid until the next call to plm_decode_audio()
+// or until plm_destroy() is called.
 
 plm_samples_t *plm_decode_audio(plm_t *self);
 
@@ -388,8 +388,7 @@ plm_buffer_t *plm_buffer_create_with_filename(const char *filename);
 
 
 // Create a buffer instance with file handle. Pass TRUE to close_when_done
-// to let plmpeg call fclose() on the handle when plm_destroy() is 
-// called.
+// to let plmpeg call fclose() on the handle when plm_destroy() is called.
 
 plm_buffer_t *plm_buffer_create_with_file(FILE *fh, int close_when_done);
 
@@ -468,7 +467,7 @@ int plm_demux_get_num_video_streams(plm_demux_t *self);
 int plm_demux_get_num_audio_streams(plm_demux_t *self);
 
 
-// Rewinds the internal buffer. See plm_buffer_rewind().
+// Rewind the internal buffer. See plm_buffer_rewind().
 
 void plm_demux_rewind(plm_demux_t *self);
 
@@ -508,6 +507,7 @@ int plm_video_get_height(plm_video_t *self);
 
 // Set "no delay" mode. When enabled, the decoder assumes that the video does
 // *not* contain any B-Frames. This is useful for reducing lag when streaming.
+// The default is FALSE.
 
 void plm_video_set_no_delay(plm_video_t *self, int no_delay);
 
@@ -517,7 +517,7 @@ void plm_video_set_no_delay(plm_video_t *self, int no_delay);
 double plm_video_get_time(plm_video_t *self);
 
 
-// Rewinds the internal buffer. See plm_buffer_rewind().
+// Rewind the internal buffer. See plm_buffer_rewind().
 
 void plm_video_rewind(plm_video_t *self);
 
@@ -529,9 +529,9 @@ void plm_video_rewind(plm_video_t *self);
 plm_frame_t *plm_video_decode(plm_video_t *self);
 
 
-// Convert the YCrCb data of a frame into an interleaved RGB buffer. The buffer
-// pointed to by *rgb must have a size of (frame->width * frame->height * 3)
-// bytes.
+// Convert the YCrCb data of a frame into an interleaved RGB buffer.
+// The buffer pointed to by *rgb must have a size of at least 
+// (frame->width * frame->height * 3) bytes.
 
 void plm_frame_to_rgb(plm_frame_t *frame, uint8_t *rgb);
 
@@ -562,7 +562,7 @@ int plm_audio_get_samplerate(plm_audio_t *self);
 double plm_audio_get_time(plm_audio_t *self);
 
 
-// Rewinds the internal buffer. See plm_buffer_rewind().
+// Rewind the internal buffer. See plm_buffer_rewind().
 
 void plm_audio_rewind(plm_audio_t *self);
 
@@ -686,7 +686,6 @@ int plm_get_audio_enabled(plm_t *self) {
 }
 
 void plm_set_audio_enabled(plm_t *self, int enabled, int stream_index) {
-	int num_streams = plm_demux_get_num_audio_streams(self->demux);
 	self->audio_packet_type = (enabled && stream_index >= 0 && stream_index < 4)
 		? PLM_DEMUX_PACKET_AUDIO_1 + stream_index
 		: 0;
@@ -767,13 +766,13 @@ void plm_set_audio_decode_callback(plm_t *self, plm_audio_decode_callback fp, vo
 	self->audio_decode_callback_user_data = user;
 }
 
-int plm_decode(plm_t *self, double tick) {
+void plm_decode(plm_t *self, double tick) {
 	int decode_video = (self->video_decode_callback && self->video_packet_type);
 	int decode_audio = (self->audio_decode_callback && self->audio_packet_type);
 
 	if (!decode_video && !decode_audio) {
 		// Nothing to do here
-		return FALSE;
+		return;
 	}
 
 	int did_decode = FALSE;
@@ -823,8 +822,6 @@ int plm_decode(plm_t *self, double tick) {
 	else {
 		self->time += tick;
 	}
-
-	return did_decode ? TRUE : FALSE;
 }
 
 plm_frame_t *plm_decode_video(plm_t *self) {
@@ -2779,7 +2776,7 @@ static const float PLM_AUDIO_SYNTHESIS_WINDOW[] = {
 	   495.5,    459.5,    424.0,    389.5,    355.5,    322.5,
 	   290.5,    259.5,    229.5,    200.5,    173.5,    147.0,
 	   122.0,     98.5,     76.5,     55.5,     36.0,     18.0,
-		1.0,    -14.5,    -28.5,    -41.5,    -53.0,    -63.5,
+	     1.0,    -14.5,    -28.5,    -41.5,    -53.0,    -63.5,
 	   -73.0,    -81.5,    -88.5,    -94.5,   -100.0,   -104.0,
 	  -107.5,   -110.5,   -112.0,   -113.5,   -114.0,   -114.0,
 	  -113.5,   -112.5,   -111.0,   -109.0,    106.5,    104.0,
@@ -2811,7 +2808,7 @@ static const uint8_t PLM_AUDIO_QUANT_TAB_C = 8;           // Table 3-B.2c:  low-
 static const uint8_t PLM_AUDIO_QUANT_TAB_D = 12;          // Table 3-B.2d:  low-rate, sblimit = 12
 
 static const uint8_t QUANT_LUT_STEP_2[3][3] = {
-	//                44.1 kHz,                   48 kHz,                   32 kHz
+	//44.1 kHz,              48 kHz,                32 kHz
 	{ PLM_AUDIO_QUANT_TAB_C, PLM_AUDIO_QUANT_TAB_C, PLM_AUDIO_QUANT_TAB_D }, // 32 - 48 kbit/sec/ch
 	{ PLM_AUDIO_QUANT_TAB_A, PLM_AUDIO_QUANT_TAB_A, PLM_AUDIO_QUANT_TAB_A }, // 56 - 80 kbit/sec/ch
 	{ PLM_AUDIO_QUANT_TAB_B, PLM_AUDIO_QUANT_TAB_A, PLM_AUDIO_QUANT_TAB_B }  // 96+	 kbit/sec/ch
@@ -3095,26 +3092,22 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 			if (self->allocation[ch][sb]) {
 				int *sf = self->scale_factor[ch][sb];
 				switch (self->scale_factor_info[ch][sb]) {
-				case 0:
-					sf[0] = plm_buffer_read(self->buffer, 6);
-					sf[1] = plm_buffer_read(self->buffer, 6);
-					sf[2] = plm_buffer_read(self->buffer, 6);
-					break;
-				case 1:
-					sf[0] =
+					case 0:
+						sf[0] = plm_buffer_read(self->buffer, 6);
 						sf[1] = plm_buffer_read(self->buffer, 6);
-					sf[2] = plm_buffer_read(self->buffer, 6);
-					break;
-				case 2:
-					sf[0] =
-						sf[1] =
 						sf[2] = plm_buffer_read(self->buffer, 6);
-					break;
-				case 3:
-					sf[0] = plm_buffer_read(self->buffer, 6);
-					sf[1] =
+						break;
+					case 1:
+						sf[0] = sf[1] = plm_buffer_read(self->buffer, 6);
 						sf[2] = plm_buffer_read(self->buffer, 6);
-					break;
+						break;
+					case 2:
+						sf[0] = sf[1] = sf[2] = plm_buffer_read(self->buffer, 6);
+						break;
+					case 3:
+						sf[0] = plm_buffer_read(self->buffer, 6);
+						sf[1] = sf[2] = plm_buffer_read(self->buffer, 6);
+						break;
 				}
 			}
 		}

@@ -279,16 +279,20 @@ void app_destroy(app_t *self) {
 	free(self);
 }
 
-double audio_lead = 0;
 void app_update(app_t *self) {
 	SDL_Event ev;
 	while (SDL_PollEvent(&ev)) {
-		if (ev.type == SDL_QUIT || (ev.type == SDL_KEYUP && ev.key.keysym.sym == SDLK_ESCAPE)
+		if (
+			ev.type == SDL_QUIT || 
+			(ev.type == SDL_KEYUP && ev.key.keysym.sym == SDLK_ESCAPE)
 		) {
 			self->wants_to_quit = true;
 		}
 		
-		if (ev.type == SDL_WINDOWEVENT && ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+		if (
+			ev.type == SDL_WINDOWEVENT &&
+			ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED
+		) {
 			glViewport(0, 0, ev.window.data1, ev.window.data2);
 		}
 	}
