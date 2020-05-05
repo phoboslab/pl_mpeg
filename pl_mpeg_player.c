@@ -29,6 +29,9 @@ SOFTWARE.
 
 plmpeg-player <video-file.mpg>
 
+Use the arrow keys to seek forward/backward by 3 seconds. Click anywhere on the
+window to seek to seek through the whole file.
+
 
 -- About
 
@@ -332,7 +335,7 @@ void app_update(app_t *self) {
 	// Seek or advance decode
 	if (seek_to != -1) {
 		SDL_ClearQueuedAudio(self->audio_device);
-		plm_seek(self->plm, seek_to, TRUE);
+		plm_seek(self->plm, seek_to, FALSE);
 	}
 	else {
 		plm_decode(self->plm, elapsed_time);
