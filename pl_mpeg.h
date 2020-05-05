@@ -76,33 +76,25 @@ Interfaces are written in an object orientet style, meaning you create object
 instances via various different constructor functions (plm_*create()),
 do some work on them and later dispose them via plm_*destroy().
 
-plm_*        -- the high-level interface, combining demuxer and decoders
-plm_buffer_* -- the data source used by all interfaces
-plm_demux_*  -- the MPEG-PS demuxer
-plm_video_*  -- the MPEG1 Video ("mpeg1") decoder
-plm_audio_*  -- the MPEG1 Audio Layer II ("mp2") decoder
+plm_* ......... the high-level interface, combining demuxer and decoders
+plm_buffer_* .. the data source used by all interfaces
+plm_demux_* ... the MPEG-PS demuxer
+plm_video_* ... the MPEG1 Video ("mpeg1") decoder
+plm_audio_* ... the MPEG1 Audio Layer II ("mp2") decoder
 
-
-This library uses malloc(), realloc() and free() to manage memory. Typically 
-all allocation happen up-front when creating the interface. However, the
-default buffer size may be too small for certain inputs. In these cases plmpeg
-will realloc() the buffer with a larger size whenever needed. You can configure
-the default buffer size by defining PLM_BUFFER_DEFAULT_SIZE *before* 
-including this library.
 
 With the high-level interface you have two options to decode video & audio:
 
-1) Use plm_decode() and just hand over the delta time since the last call.
-It will decode everything needed and call your callbacks (specified through
-plm_set_{video|audio}_decode_callback()) any number of times.
+ 1. Use plm_decode() and just hand over the delta time since the last call.
+    It will decode everything needed and call your callbacks (specified through
+    plm_set_{video|audio}_decode_callback()) any number of times.
 
-2) Use plm_decode_video() and plm_decode_audio() to decode exactly one
-frame of video or audio data at a time. How you handle the synchronization of
-both streams is up to you.
+ 2. Use plm_decode_video() and plm_decode_audio() to decode exactly one
+    frame of video or audio data at a time. How you handle the synchronization 
+    of both streams is up to you.
 
 If you only want to decode video *or* audio through these functions, you should
 disable the other stream (plm_set_{video|audio}_enabled(FALSE))
-
 
 Video data is decoded into a struct with all 3 planes (Y, Cr, Cb) stored in
 separate buffers. You can either convert this to RGB on the CPU (slow) via the
@@ -120,6 +112,14 @@ Audio data is decoded into a struct with either one single float array with the
 samples for the left and right channel interleaved, or if the 
 PLM_AUDIO_SEPARATE_CHANNELS is defined *before* including this library, into
 two separate float arrays - one for each channel.
+
+
+This library uses malloc(), realloc() and free() to manage memory. Typically 
+all allocation happens up-front when creating the interface. However, the
+default buffer size may be too small for certain inputs. In these cases plmpeg
+will realloc() the buffer with a larger size whenever needed. You can configure
+the default buffer size by defining PLM_BUFFER_DEFAULT_SIZE *before* 
+including this library.
 
 
 See below for detailed the API documentation.
@@ -246,27 +246,28 @@ typedef void(*plm_buffer_load_callback)(plm_buffer_t *self, void *user);
 plm_t *plm_create_with_filename(const char *filename);
 
 
-// Create a plmpeg instance with file handle. Pass TRUE to close_when_done
-// to let plmpeg call fclose() on the handle when plm_destroy() is 
-// called.
+// Create a plmpeg instance with a file handle. Pass TRUE to close_when_done to
+// let plmpeg call fclose() on the handle when plm_destroy() is called.
 
 plm_t *plm_create_with_file(FILE *fh, int close_when_done);
 
 
-// Create a plmpeg instance with pointer to memory as source. This assumes the
-// whole file is in memory. Pass TRUE to free_when_done to let plmpeg call
-// free() on the pointer when plm_destroy() is called.
+// Create a plmpeg instance with a pointer to memory as source. This assumes the
+// whole file is in memory. The memory is not copied. Pass TRUE to 
+// free_when_done to let plmpeg call free() on the pointer when plm_destroy() 
+// is called.
 
 plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done);
 
 
-// Create a plmpeg instance with a plm_buffer as source. This is also 
-// called internally by all the above constructor functions.
+// Create a plmpeg instance with a plm_buffer as source. Pass TRUE to
+// destroy_when_done to let plmpeg call plm_buffer_destroy() on the buffer when
+// plm_destroy() is called.
 
 plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
 
 
-// Destroy a plmpeg instance and free all data
+// Destroy a plmpeg instance and free all data.
 
 void plm_destroy(plm_t *self);
 
@@ -284,35 +285,37 @@ int plm_get_audio_enabled(plm_t *self);
 void plm_set_audio_enabled(plm_t *self, int enabled, int stream_index);
 
 
-// Get the display width/height of the video stream
+// Get the display width/height of the video stream.
 
 int plm_get_width(plm_t *self);
 int plm_get_height(plm_t *self);
 
 
-// Get the framerate of the video stream in frames per second
+// Get the framerate of the video stream in frames per second.
 
 double plm_get_framerate(plm_t *self);
 
 
-// Get the number of available audio streams in the file
+// Get the number of available audio streams in the file.
 
 int plm_get_num_audio_streams(plm_t *self);
 
 
-// Get the samplerate of the audio stream in samples per second
+// Get the samplerate of the audio stream in samples per second.
 
 int plm_get_samplerate(plm_t *self);
 
 
 // Get or set the audio lead time in seconds - the time in which audio samples
-// are decoded in advance (or behind) the video decode time. Default 0.
+// are decoded in advance (or behind) the video decode time. Typically this
+// should be set to the duration of the buffer of the audio API that you use
+// for output. E.g. for SDL2: (SDL_AudioSpec.samples / samplerate)
 
 double plm_get_audio_lead_time(plm_t *self);
 void plm_set_audio_lead_time(plm_t *self, double lead_time);
 
 
-// Get the current internal time in seconds
+// Get the current internal time in seconds.
 
 double plm_get_time(plm_t *self);
 
@@ -351,8 +354,10 @@ void plm_set_video_decode_callback(plm_t *self, plm_video_decode_callback fp, vo
 void plm_set_audio_decode_callback(plm_t *self, plm_audio_decode_callback fp, void *user);
 
 
-// Advance the internal timer by seconds and decode video/audio up to
-// this time.
+// Advance the internal timer by seconds and decode video/audio up to this time.
+// This will call the video_decode_callback and audio_decode_callback any number
+// of times. A frame-skip is currently not implemented, i.e. everything up to
+// current time will be decoded.
 
 void plm_decode(plm_t *self, double seconds);
 
@@ -482,12 +487,12 @@ static const int PLM_DEMUX_PACKET_AUDIO_4 = 0xC2;
 static const int PLM_DEMUX_PACKET_VIDEO_1 = 0xE0;
 
 
-// Create a demuxer with a plm_buffer as source 
+// Create a demuxer with a plm_buffer as source.
 
 plm_demux_t *plm_demux_create(plm_buffer_t *buffer, int destroy_when_done);
 
 
-// Destroy a demuxer and free all data
+// Destroy a demuxer and free all data.
 
 void plm_demux_destroy(plm_demux_t *self);
 
@@ -541,22 +546,22 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self);
 // Decode MPEG1 Video ("mpeg1") data into raw YCrCb frames
 
 
-// Create a video decoder with a plm_buffer as source
+// Create a video decoder with a plm_buffer as source.
 
 plm_video_t *plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
 
 
-// Destroy a video decoder and free all data
+// Destroy a video decoder and free all data.
 
 void plm_video_destroy(plm_video_t *self);
 
 
-// Get the framerate in frames per second
+// Get the framerate in frames per second.
 
 double plm_video_get_framerate(plm_video_t *self);
 
 
-// Get the display width/height
+// Get the display width/height.
 
 int plm_video_get_width(plm_video_t *self);
 int plm_video_get_height(plm_video_t *self);
@@ -569,7 +574,7 @@ int plm_video_get_height(plm_video_t *self);
 void plm_video_set_no_delay(plm_video_t *self, int no_delay);
 
 
-// Get the current internal time in seconds
+// Get the current internal time in seconds.
 
 double plm_video_get_time(plm_video_t *self);
 
@@ -606,22 +611,22 @@ void plm_frame_to_rgb(plm_frame_t *frame, uint8_t *rgb);
 // Decode MPEG-1 Audio Layer II ("mp2") data into raw samples
 
 
-// Create an audio decoder with a plm_buffer as source
+// Create an audio decoder with a plm_buffer as source.
 
 plm_audio_t *plm_audio_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
 
 
-// Destroy an audio decoder and free all data
+// Destroy an audio decoder and free all data.
 
 void plm_audio_destroy(plm_audio_t *self);
 
 
-// Get the samplerate in samples per second
+// Get the samplerate in samples per second.
 
 int plm_audio_get_samplerate(plm_audio_t *self);
 
 
-// Get the current internal time in seconds
+// Get the current internal time in seconds.
 
 double plm_audio_get_time(plm_audio_t *self);
 
@@ -785,9 +790,9 @@ double plm_get_framerate(plm_t *self) {
 }
 
 int plm_get_num_audio_streams(plm_t *self) {
-	// Some files do not specify the number of audio streams in the system header.
-	// If the reported number of streams is 0, we check if we have a samplerate, 
-	// indicating at least one audio stream.
+	// Some files do not specify the number of audio streams in the system 
+	// header. If the reported number of streams is 0, we check if we have a 
+	// samplerate, indicating at least one audio stream.
 	int num_streams = plm_demux_get_num_audio_streams(self->demux);
 	return num_streams == 0 && plm_get_samplerate(self) ? 1 : num_streams;
 }
@@ -2342,7 +2347,6 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 	} while (!frame);
 	
 	frame->time = self->time;
-
 	self->frames_decoded++;
 	self->time = (double)self->frames_decoded / self->framerate;
 	
