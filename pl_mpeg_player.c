@@ -184,10 +184,11 @@ app_t * app_create(const char *filename, int texture_mode) {
 	int samplerate = plm_get_samplerate(self->plm);
 
 	SDL_Log(
-		"Opened %s - framerate: %f, samplerate: %d",
+		"Opened %s - framerate: %f, samplerate: %d, duration: %f",
 		filename, 
 		plm_get_framerate(self->plm),
-		plm_get_samplerate(self->plm)
+		plm_get_samplerate(self->plm),
+		plm_get_duration(self->plm)
 	);
 	
 	plm_set_video_decode_callback(self->plm, app_on_video, self);
@@ -284,6 +285,8 @@ void app_destroy(app_t *self) {
 }
 
 void app_update(app_t *self) {
+	double seek_to = -1;
+
 	SDL_Event ev;
 	while (SDL_PollEvent(&ev)) {
 		if (
@@ -299,6 +302,14 @@ void app_update(app_t *self) {
 		) {
 			glViewport(0, 0, ev.window.data1, ev.window.data2);
 		}
+
+		// Seek 3sec forward/backward using arrow keys
+		if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_RIGHT) {
+			seek_to = plm_get_time(self->plm) + 3;
+		}
+		else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_LEFT) {
+			seek_to = plm_get_time(self->plm) - 3;
+		}
 	}
 
 	// Compute the delta time since the last app_update(), limit max step to 
@@ -309,10 +320,24 @@ void app_update(app_t *self) {
 		elapsed_time = 1.0 / 30.0;
 	}
 	self->last_time = current_time;
+
+	// Seek using mouse position
+	int mouse_x, mouse_y;
+	if (SDL_GetMouseState(&mouse_x, &mouse_y) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+		int sx, sy;
+		SDL_GetWindowSize(self->window, &sx, &sy);
+		seek_to = plm_get_duration(self->plm) * ((float)mouse_x / (float)sx);
+	}
 	
-	// Decode
-	plm_decode(self->plm, elapsed_time);
-	
+	// Seek or advance decode
+	if (seek_to != -1) {
+		SDL_ClearQueuedAudio(self->audio_device);
+		plm_seek(self->plm, seek_to, TRUE);
+	}
+	else {
+		plm_decode(self->plm, elapsed_time);
+	}
+
 	if (plm_has_ended(self->plm)) {
 		self->wants_to_quit = TRUE;
 	}
