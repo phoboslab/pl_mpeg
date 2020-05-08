@@ -39,7 +39,7 @@ not supported by this library.
 You can encode video in a suitable format using ffmpeg:
 
 ```
-ffmpeg -i input.mp4 -c:v mpeg1video -c:a mp2 -format mpeg output.mpg
+ffmpeg -i input.mp4 -c:v mpeg1video -q:v 0 -c:a mp2 -format mpeg output.mpg
 ```
 
 If you just want to quickly test the library, try this file:
