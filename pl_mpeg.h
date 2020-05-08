@@ -272,6 +272,15 @@ plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
 void plm_destroy(plm_t *self);
 
 
+// Get whether we have headers on all available streams and we can accurately
+// report the number of video/audio streams, video dimensions, framerate and
+// audio samplerate.
+// This returns FALSE if the file is not an MPEG-PS file or - when not using a
+// file as source - when not enough data is available yet.
+
+int plm_has_headers(plm_t *self);
+
+
 // Get or set whether video decoding is enabled. Default TRUE.
 
 int plm_get_video_enabled(plm_t *self);
@@ -609,6 +618,12 @@ plm_video_t *plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when
 void plm_video_destroy(plm_video_t *self);
 
 
+// Get whether a sequence header was found and we can accurately report on
+// dimensions and framerate.
+
+int plm_video_has_header(plm_video_t *self);
+
+
 // Get the framerate in frames per second.
 
 double plm_video_get_framerate(plm_video_t *self);
@@ -677,6 +692,12 @@ plm_audio_t *plm_audio_create_with_buffer(plm_buffer_t *buffer, int destroy_when
 // Destroy an audio decoder and free all data.
 
 void plm_audio_destroy(plm_audio_t *self);
+
+
+// Get whether a frame header was found and we can accurately report on
+// samplerate.
+
+int plm_audio_has_header(plm_audio_t *self);
 
 
 // Get the samplerate in samples per second.
@@ -856,6 +877,25 @@ void plm_destroy(plm_t *self) {
 
 int plm_get_audio_enabled(plm_t *self) {
 	return self->audio_enabled;
+}
+
+int plm_has_headers(plm_t *self) {
+	if (!plm_demux_has_headers(self->demux)) {
+		return FALSE;
+	}
+	
+	if (!plm_init_decoders(self)) {
+		return FALSE;
+	}
+
+	if (
+		(self->video_decoder && !plm_video_has_header(self->video_decoder)) ||
+		(self->audio_decoder && !plm_audio_has_header(self->audio_decoder))
+	) {
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 void plm_set_audio_enabled(plm_t *self, int enabled) {
@@ -1530,7 +1570,6 @@ int plm_buffer_next_start_code(plm_buffer_t *self) {
 		}
 		self->bit_index += 8;
 	}
-	self->bit_index = (self->length << 3);
 	return -1;
 }
 
@@ -2561,15 +2600,21 @@ void plm_video_destroy(plm_video_t *self) {
 }
 
 double plm_video_get_framerate(plm_video_t *self) {
-	return self->framerate;
+	return plm_video_has_header(self)
+		? self->framerate
+		: 0;
 }
 
 int plm_video_get_width(plm_video_t *self) {
-	return self->width;
+	return plm_video_has_header(self)
+		? self->width
+		: 0;
 }
 
 int plm_video_get_height(plm_video_t *self) {
-	return self->height;
+	return plm_video_has_header(self)
+		? self->height
+		: 0;
 }
 
 void plm_video_set_no_delay(plm_video_t *self, int no_delay) {
@@ -2598,16 +2643,8 @@ int plm_video_has_ended(plm_video_t *self) {
 }
 
 plm_frame_t *plm_video_decode(plm_video_t *self) {
-	if (!self->has_sequence_header) {
-		if (self->start_code != PLM_START_SEQUENCE) {
-			self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_SEQUENCE);
-		}
-		if (self->start_code == -1) {
-			return NULL;
-		}
-		if (!plm_video_decode_sequence_header(self)) {
-			return NULL;
-		}
+	if (!plm_video_has_header(self)) {
+		return NULL;
 	}
 	
 	plm_frame_t *frame = NULL;
@@ -2652,6 +2689,22 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 	self->time = (double)self->frames_decoded / self->framerate;
 	
 	return frame;
+}
+
+int plm_video_has_header(plm_video_t *self) {
+	if (self->has_sequence_header) {
+		return TRUE;
+	}
+	
+	if (self->start_code != PLM_START_SEQUENCE) {
+		self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_SEQUENCE);
+	}
+	if (self->start_code == -1) {
+		return FALSE;
+	}
+	if (!plm_video_decode_sequence_header(self)) {
+		return FALSE;
+	}
 }
 
 int plm_video_decode_sequence_header(plm_video_t *self) {
@@ -3619,7 +3672,7 @@ plm_audio_t *plm_audio_create_with_buffer(plm_buffer_t *buffer, int destroy_when
 	self->samples.count = PLM_AUDIO_SAMPLES_PER_FRAME;
 	self->buffer = buffer;
 	self->destroy_buffer_when_done = destroy_when_done;
-	self->samplerate_index = 3;
+	self->samplerate_index = 3; // Indicates 0
 
 	memcpy(self->D, PLM_AUDIO_SYNTHESIS_WINDOW, 512 * sizeof(float));
 	memcpy(self->D + 512, PLM_AUDIO_SYNTHESIS_WINDOW, 512 * sizeof(float));
@@ -3637,8 +3690,19 @@ void plm_audio_destroy(plm_audio_t *self) {
 	free(self);
 }
 
+int plm_audio_has_header(plm_audio_t *self) {
+	if (self->has_header) {
+		return TRUE;
+	}
+	
+	self->next_frame_data_size = plm_audio_decode_header(self);
+	return self->has_header;
+}
+
 int plm_audio_get_samplerate(plm_audio_t *self) {
-	return PLM_AUDIO_SAMPLE_RATE[self->samplerate_index];
+	return plm_audio_has_header(self)
+		? PLM_AUDIO_SAMPLE_RATE[self->samplerate_index]
+		: 0;
 }
 
 double plm_audio_get_time(plm_audio_t *self) {
