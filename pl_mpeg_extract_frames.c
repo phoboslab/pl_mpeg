@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	plm_set_audio_enabled(plm, FALSE, 0);
+	plm_set_audio_enabled(plm, FALSE);
 	
 	int w = plm_get_width(plm);
 	int h = plm_get_height(plm);
