@@ -198,7 +198,8 @@ app_t * app_create(const char *filename, int texture_mode) {
 	plm_set_audio_decode_callback(self->plm, app_on_audio, self);
 	
 	plm_set_loop(self->plm, TRUE);
-	plm_set_audio_enabled(self->plm, TRUE, 0);
+	plm_set_audio_enabled(self->plm, TRUE);
+	plm_set_audio_stream(self->plm, 0);
 
 	if (plm_get_num_audio_streams(self->plm) > 0) {
 		// Initialize SDL Audio
