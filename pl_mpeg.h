@@ -114,6 +114,38 @@ PLM_AUDIO_SEPARATE_CHANNELS is defined *before* including this library, into
 two separate float arrays - one for each channel.
 
 
+Data can be supplied to the high level interface, the demuxer and the decoders
+in three different ways:
+
+ 1. Using plm_create_from_filename() or with a file handle with 
+    plm_create_from_file().
+
+ 2. Using plm_create_with_memory() and supplying a pointer to memory that
+    contains the whole file.
+
+ 3. Using plm_create_with_buffer(), supplying your own plm_buffer_t instance and
+    periodically writing to this buffer.
+
+When using your own plm_buffer_t instance, you can fill this buffer using 
+plm_buffer_write(). You can either monitor plm_buffer_get_remaining() and push 
+data when appropriate, or install a callback on the buffer with 
+plm_buffer_set_load_callback() that gets called whenever the buffer needs more 
+data.
+
+A buffer created with plm_buffer_create_with_capacity() is treated as a ring
+buffer, meaning that data that has already been read, will be discarded. In
+contrast, a buffer created with plm_buffer_create_for_appending() will keep all
+data written to it in memory. This enables seeking in the already loaded data.
+
+
+There should be no need to use the lower level plm_demux_*, plm_video_* and 
+plm_audio_* functions, if all you want to do is read/decode an MPEG-PS file.
+However, if you get raw mpeg1video data or raw mp2 audio data from a different
+source, these functions can be used to decode the raw data directly. Similarly, 
+if you only want to analyze an MPEG-PS file or extract raw video or audio
+packets from it, you can use the plm_demux_* functions.
+
+
 This library uses malloc(), realloc() and free() to manage memory. Typically 
 all allocation happens up-front when creating the interface. However, the
 default buffer size may be too small for certain inputs. In these cases plmpeg
@@ -361,13 +393,15 @@ int plm_has_ended(plm_t *self);
 
 
 // Set the callback for decoded video frames used with plm_decode(). If no 
-// callback is set, video data will be ignored and not be decoded.
+// callback is set, video data will be ignored and not be decoded. The *user
+// Parameter will be passed to your callback.
 
 void plm_set_video_decode_callback(plm_t *self, plm_video_decode_callback fp, void *user);
 
 
 // Set the callback for decoded audio samples used with plm_decode(). If no 
-// callback is set, audio data will be ignored and not be decoded.
+// callback is set, audio data will be ignored and not be decoded. The *user
+// Parameter will be passed to your callback.
 
 void plm_set_audio_decode_callback(plm_t *self, plm_audio_decode_callback fp, void *user);
 
@@ -399,8 +433,8 @@ plm_samples_t *plm_decode_audio(plm_t *self);
 
 
 // Seek to the specified time, clamped between 0 -- duration. This can only be 
-// used when the underlying plm_buffer is seekable, i.e. for files and fixed 
-// memory. 
+// used when the underlying plm_buffer is seekable, i.e. for files, fixed 
+// memory buffers or _for_appending buffers. 
 // If seek_exact is TRUE this will seek to the exact time, otherwise it will 
 // seek to the last intra frame just before the desired time. Exact seeking can 
 // be slow, because all frames up to the seeked one have to be decoded on top of
