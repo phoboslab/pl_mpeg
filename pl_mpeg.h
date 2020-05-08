@@ -2729,16 +2729,19 @@ int plm_video_has_header(plm_video_t *self) {
 	if (self->has_sequence_header) {
 		return TRUE;
 	}
-	
+
 	if (self->start_code != PLM_START_SEQUENCE) {
 		self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_SEQUENCE);
 	}
 	if (self->start_code == -1) {
 		return FALSE;
 	}
+	
 	if (!plm_video_decode_sequence_header(self)) {
 		return FALSE;
 	}
+
+	return TRUE;
 }
 
 int plm_video_decode_sequence_header(plm_video_t *self) {
@@ -4245,7 +4248,7 @@ void plm_audio_matrix_transform(int s[32][3], int ss, float *d, int dp) {
 	d[dp + 13] = t24; d[dp + 18] = -t31;
 	d[dp + 14] = t31; d[dp + 17] = -t02;
 	d[dp + 15] = t02; d[dp + 16] = 0.0;
-};
+}
 
 
 #endif // PL_MPEG_IMPLEMENTATION
