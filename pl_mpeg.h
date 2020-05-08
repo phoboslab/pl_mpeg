@@ -1596,6 +1596,7 @@ typedef struct plm_demux_t {
 	int destroy_buffer_when_done;
 	double system_clock_ref;
 
+	int last_file_size;
 	double last_decoded_pts;
 	double start_time;
 	double duration;
@@ -1755,7 +1756,12 @@ double plm_demux_get_start_time(plm_demux_t *self, int type) {
 }
 
 double plm_demux_get_duration(plm_demux_t *self, int type) {
-	if (self->duration != PLM_PACKET_INVALID_TS) {
+	int file_size = plm_buffer_get_size(self->buffer);
+
+	if (
+		self->duration != PLM_PACKET_INVALID_TS &&
+		self->last_file_size == file_size
+	) {
 		return self->duration;
 	}
 
@@ -1766,7 +1772,6 @@ double plm_demux_get_duration(plm_demux_t *self, int type) {
 	// back if needed.
 	int start_range = 64 * 1024;
 	int max_range = 4096 * 1024;
-	int file_size = plm_buffer_get_size(self->buffer);
 	for (int range = start_range; range <= max_range; range *= 2) {
 		int seek_pos = file_size - range;
 		if (seek_pos < 0) {
@@ -1791,6 +1796,7 @@ double plm_demux_get_duration(plm_demux_t *self, int type) {
 
 	plm_demux_buffer_seek(self, previous_pos);
 	self->start_code = previous_start_code;
+	self->last_file_size = file_size;
 	return self->duration;
 }
 
