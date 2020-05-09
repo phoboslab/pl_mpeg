@@ -3698,7 +3698,7 @@ typedef struct plm_audio_t {
 
 	plm_samples_t samples;
 	float D[1024];
-	float V[1024];
+	float V[2][1024];
 	float U[32];
 } plm_audio_t;
 
@@ -4005,7 +4005,7 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 				self->v_pos = (self->v_pos - 64) & 1023;
 
 				for (int ch = 0; ch < 2; ch++) {
-					plm_audio_matrix_transform(self->sample[ch], p, self->V, self->v_pos);
+					plm_audio_matrix_transform(self->sample[ch], p, self->V[ch], self->v_pos);
 
 					// Build U, windowing, calculate output
 					memset(self->U, 0, sizeof(self->U));
@@ -4014,7 +4014,7 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 					int v_index = (self->v_pos % 128) >> 1;
 					while (v_index < 1024) {
 						for (int i = 0; i < 32; ++i) {
-							self->U[i] += self->D[d_index++] * self->V[v_index++];
+							self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
 						}
 
 						v_index += 128 - 32;
@@ -4025,7 +4025,7 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 					v_index = (128 - 32 + 1024) - v_index;
 					while (v_index < 1024) {
 						for (int i = 0; i < 32; ++i) {
-							self->U[i] += self->D[d_index++] * self->V[v_index++];
+							self->U[i] += self->D[d_index++] * self->V[ch][v_index++];
 						}
 
 						v_index += 128 - 32;
