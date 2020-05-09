@@ -3902,19 +3902,12 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 	// Prepare the quantizer table lookups
 	int tab3 = 0;
 	int sblimit = 0;
-	if (self->version == PLM_AUDIO_MPEG_2) {
-		// MPEG-2 (LSR)
-		tab3 = 2;
-		sblimit = 30;
-	}
-	else {
-		// MPEG-1
-		int tab1 = (self->mode == PLM_AUDIO_MODE_MONO) ? 0 : 1;
-		int tab2 = PLM_AUDIO_QUANT_LUT_STEP_1[tab1][self->bitrate_index];
-		tab3 = QUANT_LUT_STEP_2[tab2][self->samplerate_index];
-		sblimit = tab3 & 63;
-		tab3 >>= 6;
-	}
+	
+	int tab1 = (self->mode == PLM_AUDIO_MODE_MONO) ? 0 : 1;
+	int tab2 = PLM_AUDIO_QUANT_LUT_STEP_1[tab1][self->bitrate_index];
+	tab3 = QUANT_LUT_STEP_2[tab2][self->samplerate_index];
+	sblimit = tab3 & 63;
+	tab3 >>= 6;
 
 	if (self->bound > sblimit) {
 		self->bound = sblimit;
@@ -3957,15 +3950,19 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 						sf[2] = plm_buffer_read(self->buffer, 6);
 						break;
 					case 1:
-						sf[0] = sf[1] = plm_buffer_read(self->buffer, 6);
+						sf[0] = 
+						sf[1] = plm_buffer_read(self->buffer, 6);
 						sf[2] = plm_buffer_read(self->buffer, 6);
 						break;
 					case 2:
-						sf[0] = sf[1] = sf[2] = plm_buffer_read(self->buffer, 6);
+						sf[0] = 
+						sf[1] = 
+						sf[2] = plm_buffer_read(self->buffer, 6);
 						break;
 					case 3:
 						sf[0] = plm_buffer_read(self->buffer, 6);
-						sf[1] = sf[2] = plm_buffer_read(self->buffer, 6);
+						sf[1] = 
+						sf[2] = plm_buffer_read(self->buffer, 6);
 						break;
 				}
 			}
