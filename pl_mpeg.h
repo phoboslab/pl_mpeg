@@ -1078,7 +1078,7 @@ void plm_decode(plm_t *self, double tick) {
 	do {
 		did_decode = FALSE;
 		
-		if (decode_video &&	plm_video_get_time(self->video_decoder) < video_target_time) {
+		if (decode_video && plm_video_get_time(self->video_decoder) < video_target_time) {
 			plm_frame_t *frame = plm_video_decode(self->video_decoder);
 			if (frame) {
 				self->video_decode_callback(self, frame, self->video_decode_callback_user_data);
@@ -1190,7 +1190,7 @@ void plm_read_packets(plm_t *self, int requested_type) {
 		if (self->video_buffer) {
 			plm_buffer_signal_end(self->video_buffer);
 		}
-		else if (self->audio_buffer) {
+		if (self->audio_buffer) {
 			plm_buffer_signal_end(self->audio_buffer);
 		}
 	}
