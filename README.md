@@ -52,5 +52,4 @@ https://phoboslab.org/files/bjork-all-is-full-of-love.mpg
 - no error reporting. PL_MPEG will silently ignore any invalid data.
 - the pts (presentation time stamp) for packets in the MPEG-PS container is
 ignored. This may cause sync issues with some files.
-- no seeking.
 - bugs, probably.
