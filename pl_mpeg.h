@@ -1332,8 +1332,8 @@ typedef struct {
 } plm_vlc_uint_t;
 
 
-void plm_buffer_seek(plm_buffer_t *self, int offset);
-int plm_buffer_tell(plm_buffer_t *self);
+void plm_buffer_seek(plm_buffer_t *self, size_t pos);
+size_t plm_buffer_tell(plm_buffer_t *self);
 void plm_buffer_discard_read_bytes(plm_buffer_t *self);
 void plm_buffer_load_file_callback(plm_buffer_t *self, void *user);
 
@@ -1468,16 +1468,16 @@ void plm_buffer_rewind(plm_buffer_t *self) {
 	plm_buffer_seek(self, 0);
 }
 
-void plm_buffer_seek(plm_buffer_t *self, int offset) {
+void plm_buffer_seek(plm_buffer_t *self, size_t pos) {
 	self->has_ended = FALSE;
 
 	if (self->mode == PLM_BUFFER_MODE_FILE) {
-		fseek(self->fh, offset, SEEK_SET);
+		fseek(self->fh, pos, SEEK_SET);
 		self->bit_index = 0;
 		self->length = 0;
 	}
 	else if (self->mode == PLM_BUFFER_MODE_RING) {
-		if (offset != 0) {
+		if (pos != 0) {
 			// Seeking to non-0 is forbidden for dynamic-mem buffers
 			return; 
 		}
@@ -1485,12 +1485,12 @@ void plm_buffer_seek(plm_buffer_t *self, int offset) {
 		self->length = 0;
 		self->total_size = 0;
 	}
-	else if (offset < self->length) {
-		self->bit_index = offset << 3;
+	else if (pos < self->length) {
+		self->bit_index = pos << 3;
 	}
 }
 
-int plm_buffer_tell(plm_buffer_t *self) {
+size_t plm_buffer_tell(plm_buffer_t *self) {
 	return self->mode == PLM_BUFFER_MODE_FILE
 		? ftell(self->fh) + (self->bit_index >> 3) - self->length
 		: self->bit_index >> 3;
@@ -1669,7 +1669,7 @@ typedef struct plm_demux_t {
 	int destroy_buffer_when_done;
 	double system_clock_ref;
 
-	int last_file_size;
+	size_t last_file_size;
 	double last_decoded_pts;
 	double start_time;
 	double duration;
@@ -1686,7 +1686,7 @@ typedef struct plm_demux_t {
 } plm_demux_t;
 
 
-void plm_demux_buffer_seek(plm_demux_t *self, int pos);
+void plm_demux_buffer_seek(plm_demux_t *self, size_t pos);
 double plm_demux_decode_time(plm_demux_t *self);
 plm_packet_t *plm_demux_decode_packet(plm_demux_t *self, int type);
 plm_packet_t *plm_demux_get_packet(plm_demux_t *self);
@@ -1796,7 +1796,7 @@ int plm_demux_has_ended(plm_demux_t *self) {
 	return plm_buffer_has_ended(self->buffer);
 }
 
-void plm_demux_buffer_seek(plm_demux_t *self, int pos) {
+void plm_demux_buffer_seek(plm_demux_t *self, size_t pos) {
 	plm_buffer_seek(self->buffer, pos);
 	self->current_packet.length = 0;
 	self->next_packet.length = 0;
@@ -1829,7 +1829,7 @@ double plm_demux_get_start_time(plm_demux_t *self, int type) {
 }
 
 double plm_demux_get_duration(plm_demux_t *self, int type) {
-	int file_size = plm_buffer_get_size(self->buffer);
+	size_t file_size = plm_buffer_get_size(self->buffer);
 
 	if (
 		self->duration != PLM_PACKET_INVALID_TS &&
@@ -1838,15 +1838,15 @@ double plm_demux_get_duration(plm_demux_t *self, int type) {
 		return self->duration;
 	}
 
-	int previous_pos = plm_buffer_tell(self->buffer);
+	size_t previous_pos = plm_buffer_tell(self->buffer);
 	int previous_start_code = self->start_code;
 	
 	// Find last video PTS. Start searching 64kb from the end and go further 
 	// back if needed.
-	int start_range = 64 * 1024;
-	int max_range = 4096 * 1024;
-	for (int range = start_range; range <= max_range; range *= 2) {
-		int seek_pos = file_size - range;
+	long start_range = 64 * 1024;
+	long max_range = 4096 * 1024;
+	for (long range = start_range; range <= max_range; range *= 2) {
+		long seek_pos = file_size - range;
 		if (seek_pos < 0) {
 			seek_pos = 0;
 			range = max_range; // Make sure to bail after this round
@@ -1895,8 +1895,8 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 	// infinite loop. 32 retries should be enough for anybody.
 
 	double duration = plm_demux_get_duration(self, type);
-	int file_size = plm_buffer_get_size(self->buffer);
-	int byterate = file_size / duration;
+	long file_size = plm_buffer_get_size(self->buffer);
+	long byterate = file_size / duration;
 
 	double cur_time = self->last_decoded_pts;
 	double scan_span = 1;
@@ -1912,13 +1912,14 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 	for (int retry = 0; retry < 32; retry++) {
 		int found_packet_with_pts = FALSE;
 		int found_packet_in_range = FALSE;
-		int last_valid_packet_start = -1;
+		long last_valid_packet_start = -1;
 		double first_packet_time = PLM_PACKET_INVALID_TS;
 
-		int cur_pos = plm_buffer_tell(self->buffer);
+		long cur_pos = plm_buffer_tell(self->buffer);
 
 		// Estimate byte offset and jump to it.
-		int seek_pos = cur_pos + (seek_time - cur_time - scan_span) * byterate;
+		long offset = (seek_time - cur_time - scan_span) * byterate;
+		long seek_pos = cur_pos + offset;
 		if (seek_pos < 0) {
 			seek_pos = 0;
 		}
@@ -1931,7 +1932,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 		// Scan through all packets up to the seek_time to find the last packet
 		// containing an intra frame.
 		while (plm_buffer_find_start_code(self->buffer, type) != -1) {
-			int packet_start = plm_buffer_tell(self->buffer);
+			long packet_start = plm_buffer_tell(self->buffer);
 			plm_packet_t *packet = plm_demux_decode_packet(self, type);
 
 			// Skip packet if it has no PTS
@@ -1965,7 +1966,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 			// later, when we know it's the last intra frame before desired
 			// seek time.
 			if (force_intra) {
-				for (int i = 0; i < packet->length - 6; i++) {
+				for (size_t i = 0; i < packet->length - 6; i++) {
 					// Find the START_PICTURE code
 					if (
 						packet->data[i] == 0x00 &&
@@ -3792,7 +3793,7 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self) {
 }
 
 int plm_audio_find_frame_sync(plm_audio_t *self) {
-	int i;
+	size_t i;
 	for (i = self->buffer->bit_index >> 3; i < self->buffer->length-1; i++) {
 		if (
 			self->buffer->bytes[i] == 0xFF &&
