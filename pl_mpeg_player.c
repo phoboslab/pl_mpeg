@@ -87,7 +87,7 @@ steps combined.
 #include "pl_mpeg.h"
 
 
-#define APP_SHADER_SOURCE(...) #__VA_ARGS__;
+#define APP_SHADER_SOURCE(...) #__VA_ARGS__
 
 const char * const APP_VERTEX_SHADER = APP_SHADER_SOURCE(
 	attribute vec2 vertex;

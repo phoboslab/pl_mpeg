@@ -794,6 +794,8 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self);
 #define FALSE 0
 #endif
 
+#define PLM_UNUSED(expr) (void)(expr)
+
 
 // -----------------------------------------------------------------------------
 // plm (high-level interface) implementation
@@ -1162,11 +1164,13 @@ void plm_handle_end(plm_t *self) {
 }
 
 void plm_read_video_packet(plm_buffer_t *buffer, void *user) {
+	PLM_UNUSED(buffer);
 	plm_t *self = (plm_t *)user;
 	plm_read_packets(self, self->video_packet_type);
 }
 
 void plm_read_audio_packet(plm_buffer_t *buffer, void *user) {
+	PLM_UNUSED(buffer);
 	plm_t *self = (plm_t *)user;
 	plm_read_packets(self, self->audio_packet_type);
 }
@@ -1510,6 +1514,8 @@ void plm_buffer_discard_read_bytes(plm_buffer_t *self) {
 }
 
 void plm_buffer_load_file_callback(plm_buffer_t *self, void *user) {
+	PLM_UNUSED(user);
+	
 	if (self->discard_read_bytes) {
 		plm_buffer_discard_read_bytes(self);
 	}
@@ -3195,7 +3201,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 				self->block_data[0] = predictor + differential;
 			}
 			else {
-				self->block_data[0] = predictor + ((-1 << dct_size) | (differential + 1));
+				self->block_data[0] = predictor + (-(1 << dct_size) | (differential + 1));
 			}
 		}
 		else {
