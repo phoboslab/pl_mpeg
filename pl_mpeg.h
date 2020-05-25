@@ -1658,7 +1658,7 @@ int16_t plm_buffer_read_vlc(plm_buffer_t *self, const plm_vlc_t *table) {
 }
 
 uint16_t plm_buffer_read_vlc_uint(plm_buffer_t *self, const plm_vlc_uint_t *table) {
-	return (uint16_t)plm_buffer_read_vlc(self, (plm_vlc_t *)table);
+	return (uint16_t)plm_buffer_read_vlc(self, (const plm_vlc_t *)table);
 }
 
 
