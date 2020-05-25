@@ -402,7 +402,7 @@ void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
 		app_update_texture(self, GL_TEXTURE2, self->texture_cr, &frame->cr);
 	}
 	else {
-		plm_frame_to_rgb(frame, self->rgb_data);
+		plm_frame_to_rgb(frame, self->rgb_data, frame->width * 3);
 	
 		glBindTexture(GL_TEXTURE_2D, self->texture_rgb);
 		glTexImage2D(

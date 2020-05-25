@@ -705,12 +705,19 @@ int plm_video_has_ended(plm_video_t *self);
 plm_frame_t *plm_video_decode(plm_video_t *self);
 
 
-// Convert the YCrCb data of a frame into an interleaved RGB buffer.
-// The buffer pointed to by *rgb must have a size of at least 
-// (frame->width * frame->height * 3) bytes.
+// Convert the YCrCb data of a frame into interleaved R G B data. The stride
+// specifies the width in bytes of the destination buffer. I.e. the number of
+// bytes from one line to the next. The stride must be at least 
+// (frame->width * bytes_per_pixel). The buffer pointed to by *dest must have a
+// size of at least (stride * frame->height).
+// Note that the alpha component of the dest buffer is always left untouched.
 
-void plm_frame_to_rgb(plm_frame_t *frame, uint8_t *rgb);
-
+void plm_frame_to_rgb(plm_frame_t *frame, uint8_t *dest, int stride);
+void plm_frame_to_bgr(plm_frame_t *frame, uint8_t *dest, int stride);
+void plm_frame_to_rgba(plm_frame_t *frame, uint8_t *dest, int stride);
+void plm_frame_to_bgra(plm_frame_t *frame, uint8_t *dest, int stride);
+void plm_frame_to_argb(plm_frame_t *frame, uint8_t *dest, int stride);
+void plm_frame_to_abgr(plm_frame_t *frame, uint8_t *dest, int stride);
 
 
 // -----------------------------------------------------------------------------
@@ -3399,74 +3406,50 @@ void plm_video_idct(int *block) {
 	}
 }
 
-void plm_frame_to_rgb(plm_frame_t *frame, uint8_t *rgb) {
-	// Chroma values are the same for each block of 4 pixels, so we proccess
-	// 2 lines at a time, 2 neighboring pixels each.
+#define PLM_PUT_PIXEL(RI, GI, BI, Y_OFFSET, DEST_OFFSET) \
+	y = frame->y.data[y_index + Y_OFFSET]; \
+	dest[d_index + DEST_OFFSET + RI] = plm_clamp(y + r); \
+	dest[d_index + DEST_OFFSET + GI] = plm_clamp(y - g); \
+	dest[d_index + DEST_OFFSET + BI] = plm_clamp(y + b);
 
-	int w = frame->y.width,
-		w2 = w >> 1;
-
-	int y_index1 = 0,
-		y_index2 = w,
-		y_next_2_lines = w + (w - frame->width);
-
-	int c_index = 0,
-		c_next_line = w2 - (frame->width >> 1);
-
-	int rgb_index1 = 0,
-		rgb_index2 = frame->width * 3,
-		rgb_next_2_lines = frame->width * 3;
-
-	int cols = frame->width >> 1,
-		rows = frame->height >> 1;
-
-	int ccb, ccr, r, g, b;
-	uint8_t
-		*y = frame->y.data,
-		*cb = frame->cb.data,
-		*cr = frame->cr.data;
-
-	for (int row = 0; row < rows; row++) {
-		for (int col = 0; col < cols; col++) {
-			ccb = cb[c_index];
-			ccr = cr[c_index];
-			c_index++;
-
-			r = (ccr + ((ccr * 103) >> 8)) - 179;
-			g = ((ccb * 88) >> 8) - 44 + ((ccr * 183) >> 8) - 91;
-			b = (ccb + ((ccb * 198) >> 8)) - 227;
-
-			// Line 1
-			int y1 = y[y_index1++];
-			int y2 = y[y_index1++];
-			rgb[rgb_index1 + 0] = plm_clamp(y1 + r);
-			rgb[rgb_index1 + 1] = plm_clamp(y1 - g);
-			rgb[rgb_index1 + 2] = plm_clamp(y1 + b);
-			rgb[rgb_index1 + 3] = plm_clamp(y2 + r);
-			rgb[rgb_index1 + 4] = plm_clamp(y2 - g);
-			rgb[rgb_index1 + 5] = plm_clamp(y2 + b);
-			rgb_index1 += 6;
-
-			// Line 2
-			int y3 = y[y_index2++];
-			int y4 = y[y_index2++];
-			rgb[rgb_index2 + 0] = plm_clamp(y3 + r);
-			rgb[rgb_index2 + 1] = plm_clamp(y3 - g);
-			rgb[rgb_index2 + 2] = plm_clamp(y3 + b);
-			rgb[rgb_index2 + 3] = plm_clamp(y4 + r);
-			rgb[rgb_index2 + 4] = plm_clamp(y4 - g);
-			rgb[rgb_index2 + 5] = plm_clamp(y4 + b);
-			rgb_index2 += 6;
-		}
-
-		y_index1 += y_next_2_lines;
-		y_index2 += y_next_2_lines;
-		rgb_index1 += rgb_next_2_lines;
-		rgb_index2 += rgb_next_2_lines;
-		c_index += c_next_line;
+#define PLM_DEFINE_FRAME_CONVERT_FUNCTION(NAME, BYTES_PER_PIXEL, RI, GI, BI) \
+	void NAME(plm_frame_t *frame, uint8_t *dest, int stride) { \
+		int cols = frame->width >> 1; \
+		int rows = frame->height >> 1; \
+		int yw = frame->y.width; \
+		int cw = frame->cb.width; \
+		for (int row = 0; row < rows; row++) { \
+			int c_index = row * cw; \
+			int y_index = row * 2 * yw; \
+			int d_index = row * 2 * stride; \
+			for (int col = 0; col < cols; col++) { \
+				int y; \
+				int cr = frame->cr.data[c_index]; \
+				int cb = frame->cb.data[c_index]; \
+				int r = (cr + ((cr * 103) >> 8)) - 179; \
+				int g = ((cb * 88) >> 8) - 44 + ((cr * 183) >> 8) - 91; \
+				int b = (cb + ((cb * 198) >> 8)) - 227; \
+				PLM_PUT_PIXEL(RI, GI, BI, 0,      0); \
+				PLM_PUT_PIXEL(RI, GI, BI, 1,      BYTES_PER_PIXEL); \
+				PLM_PUT_PIXEL(RI, GI, BI, yw,     stride); \
+				PLM_PUT_PIXEL(RI, GI, BI, yw + 1, stride + BYTES_PER_PIXEL); \
+				c_index += 1; \
+				y_index += 2; \
+				d_index += 2 * BYTES_PER_PIXEL; \
+			} \
+		} \
 	}
-}
 
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_rgb,  3, 0, 1, 2)
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_bgr,  3, 2, 1, 0)
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_rgba, 4, 0, 1, 2)
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_bgra, 4, 2, 1, 0)
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_argb, 4, 1, 2, 3)
+PLM_DEFINE_FRAME_CONVERT_FUNCTION(plm_frame_to_abgr, 4, 3, 2, 1)
+
+
+#undef PLM_PUT_PIXEL
+#undef PLM_DEFINE_FRAME_CONVERT_FUNCTION
 
 
 

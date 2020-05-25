@@ -67,8 +67,8 @@ int main(int argc, char *argv[]) {
 	plm_frame_t *frame = NULL;
 
 	for (int i = 0; frame = plm_decode_video(plm); i++) {
-		plm_frame_to_rgb(frame, rgb_buffer);
-		
+		plm_frame_to_rgb(frame, rgb_buffer, w * 3);
+
 		sprintf(png_name, "%04d.png", i);
 		printf("Writing %s\n", png_name);
 		stbi_write_png(png_name, w, h, 3, rgb_buffer, w * 3);
