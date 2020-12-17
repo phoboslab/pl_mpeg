@@ -2699,7 +2699,23 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 	do {
 		if (self->start_code != PLM_START_PICTURE) {
 			self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_PICTURE);
+			
 			if (self->start_code == -1) {
+				// If we reached the end of the file and the previously decoded
+				// frame was a reference frame, we still have to return it.
+				if (
+					self->has_reference_frame &&
+					!self->assume_no_b_frames &&
+					plm_buffer_has_ended(self->buffer) && (
+						self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
+						self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE
+					)
+				) {
+					self->has_reference_frame = FALSE;
+					frame = &self->frame_backward;
+					break;
+				}
+
 				return NULL;
 			}
 		}
