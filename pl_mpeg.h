@@ -100,13 +100,13 @@ Video data is decoded into a struct with all 3 planes (Y, Cr, Cb) stored in
 separate buffers. You can either convert this to RGB on the CPU (slow) via the
 plm_frame_to_rgb() function or do it on the GPU with the following matrix:
 
-mat4 rec601 = mat4(
+mat4 bt601 = mat4(
 	1.16438,  0.00000,  1.59603, -0.87079,
 	1.16438, -0.39176, -0.81297,  0.52959,
 	1.16438,  2.01723,  0.00000, -1.08139,
 	0, 0, 0, 1
 );
-gl_FragColor = vec4(y, cb, cr, 1.0) * rec601;
+gl_FragColor = vec4(y, cb, cr, 1.0) * bt601;
 
 Audio data is decoded into a struct with either one single float array with the
 samples for the left and right channel interleaved, or if the 
@@ -3426,8 +3426,11 @@ void plm_video_idct(int *block) {
 	}
 }
 
+// YCbCr conversion following the BT.601 standard:
+// https://infogalactic.com/info/YCbCr#ITU-R_BT.601_conversion
+
 #define PLM_PUT_PIXEL(RI, GI, BI, Y_OFFSET, DEST_OFFSET) \
-	y = frame->y.data[y_index + Y_OFFSET]; \
+	y = ((frame->y.data[y_index + Y_OFFSET]-16) * 76309) >> 16; \
 	dest[d_index + DEST_OFFSET + RI] = plm_clamp(y + r); \
 	dest[d_index + DEST_OFFSET + GI] = plm_clamp(y - g); \
 	dest[d_index + DEST_OFFSET + BI] = plm_clamp(y + b);
@@ -3444,11 +3447,11 @@ void plm_video_idct(int *block) {
 			int d_index = row * 2 * stride; \
 			for (int col = 0; col < cols; col++) { \
 				int y; \
-				int cr = frame->cr.data[c_index]; \
-				int cb = frame->cb.data[c_index]; \
-				int r = (cr + ((cr * 103) >> 8)) - 179; \
-				int g = ((cb * 88) >> 8) - 44 + ((cr * 183) >> 8) - 91; \
-				int b = (cb + ((cb * 198) >> 8)) - 227; \
+				int cr = frame->cr.data[c_index] - 128; \
+				int cb = frame->cb.data[c_index] - 128; \
+				int r = (cr * 104597) >> 16; \
+				int g = (cb * 25674 + cr * 53278) >> 16; \
+				int b = (cb * 132201) >> 16; \
 				PLM_PUT_PIXEL(RI, GI, BI, 0,      0); \
 				PLM_PUT_PIXEL(RI, GI, BI, 1,      BYTES_PER_PIXEL); \
 				PLM_PUT_PIXEL(RI, GI, BI, yw,     stride); \
