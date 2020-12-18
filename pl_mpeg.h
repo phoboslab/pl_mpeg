@@ -2601,9 +2601,13 @@ typedef struct plm_video_t {
 } plm_video_t;
 
 static inline uint8_t plm_clamp(int n) {
-	return n > 255
-		? 255
-		: (n < 0 ? 0 : n);
+	if (n > 255) {
+		n = 255;
+	}
+	else if (n < 0) {
+		n = 0;
+	}
+	return n;
 }
 
 int plm_video_decode_sequence_header(plm_video_t *self);
