@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
 
 	plm_t *plm = plm_create_with_filename(argv[1]);
 	if (!plm) {
-		printf("Couldn't open file");
+		printf("Couldn't open file %s\n", argv[1]);
 		return 1;
 	}
 
@@ -66,10 +66,10 @@ int main(int argc, char *argv[]) {
 	char png_name[16];
 	plm_frame_t *frame = NULL;
 
-	for (int i = 0; frame = plm_decode_video(plm); i++) {
+	for (int i = 1; frame = plm_decode_video(plm); i++) {
 		plm_frame_to_rgb(frame, rgb_buffer, w * 3);
 
-		sprintf(png_name, "%04d.png", i);
+		sprintf(png_name, "%06d.png", i);
 		printf("Writing %s\n", png_name);
 		stbi_write_png(png_name, w, h, 3, rgb_buffer, w * 3);
 	}
