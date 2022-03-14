@@ -2735,6 +2735,7 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 		) {
 			return NULL;
 		}
+		plm_buffer_discard_read_bytes(self->buffer);
 		
 		plm_video_decode_picture(self);
 
