@@ -48,7 +48,7 @@ avoided if possible. It easily takes as much time as all other mpeg1 decoding
 steps combined.
 
 */
-
+#define SDL_MAIN_HANDLED
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -71,14 +71,14 @@ steps combined.
 	#include <windows.h>
 
 	#define GL3_PROTOTYPES 1
-	#include <glew.h>
+	#include <gl/glew.h>
 	#pragma comment(lib, "glew32.lib")
 
 	#include <gl/GL.h>
 	#pragma comment(lib, "opengl32.lib")
 
-	#include <SDL.h>
-	#include <SDL_opengl.h>
+	#include <sdl2/SDL.h>
+	#include <sdl2/SDL_opengl.h>
 	#pragma comment(lib, "SDL2.lib")
 	#pragma comment(lib, "SDL2main.lib")
 #endif
