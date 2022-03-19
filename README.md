@@ -19,6 +19,14 @@ This library does not make use of any SIMD instructions, but because of
 the relative simplicity of the codec it still manages to decode 4k60fps video
 on a single CPU core (on my i7-6700k at least).
 
+## Compilation on Linux
+
+Use a GCC invocation like the following to build the example `pl_mpeg_player`
+program:
+
+```shell
+gcc -o pl_mpeg_player pl_mpeg_player.c $(pkg-config --cflags --libs sdl2 glew)
+```
 
 ## Example Usage
 
