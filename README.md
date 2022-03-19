@@ -47,8 +47,13 @@ not supported by this library.
 You can encode video in a suitable format using ffmpeg:
 
 ```
-ffmpeg -i input.mp4 -c:v mpeg1video -c:a mp2 -format mpeg output.mpg
+ffmpeg -i input.mp4 -c:v mpeg1video -q:v 0 -c:a mp2 -format mpeg output.mpg
 ```
+
+`-q:v` sets a fixed video quality with a variable bitrate, where `0` is the 
+highest. You may use `-b:v` to set a fixed bitrate instead; e.g. 
+`-b:v 2000k` for 2000 kbit/s. Please refer to the 
+[ffmpeg documentation](http://ffmpeg.org/ffmpeg.html#Options) for more details.
 
 If you just want to quickly test the library, try this file:
 
