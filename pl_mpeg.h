@@ -72,7 +72,7 @@ in an easy to use wrapper.
 Lower-level APIs for accessing the demuxer, video decoder and audio decoder, 
 as well as providing different data sources are also available.
 
-Interfaces are written in an object orientet style, meaning you create object 
+Interfaces are written in an object oriented style, meaning you create object 
 instances via various different constructor functions (plm_*create()),
 do some work on them and later dispose them via plm_*destroy().
 
@@ -2978,7 +2978,7 @@ void plm_video_decode_macroblock(plm_video_t *self) {
 	// Process any skipped macroblocks
 	if (self->slice_begin) {
 		// The first increment of each slice is relative to beginning of the
-		// preverious row, not the preverious macroblock
+		// previous row, not the previous macroblock
 		self->slice_begin = FALSE;
 		self->macroblock_address += increment;
 	}
@@ -3830,7 +3830,7 @@ int plm_audio_decode_header(plm_audio_t *self) {
 
 	// Attempt to resync if no syncword was found. This sucks balls. The MP2 
 	// stream contains a syncword just before every frame (11 bits set to 1).
-	// However, this syncword is not guaranteed to not occur elswhere in the
+	// However, this syncword is not guaranteed to not occur elsewhere in the
 	// stream. So, if we have to resync, we also have to check if the header 
 	// (samplerate, bitrate) differs from the one we had before. This all
 	// may still lead to garbage data being decoded :/
