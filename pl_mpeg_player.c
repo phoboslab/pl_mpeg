@@ -55,7 +55,6 @@ steps combined.
 #if defined(__APPLE__) && defined(__MACH__)
 	// OSX
 	#include <SDL2/SDL.h>
-	#include <SDL2/SDL_opengl.h>
 	#include <OpenGL/gl.h>
 	#include <OpenGL/glext.h>
 
