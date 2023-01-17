@@ -1349,8 +1349,12 @@ void plm_buffer_discard_read_bytes(plm_buffer_t *self);
 void plm_buffer_load_file_callback(plm_buffer_t *self, void *user);
 
 int plm_buffer_has(plm_buffer_t *self, size_t count);
-int plm_buffer_read(plm_buffer_t *self, int count);
+int plm_buffer_read_unchecked(plm_buffer_t *self, int count);
+static inline int plm_buffer_read(plm_buffer_t *self, int count);
+int plm_buffer_read_bytes_unchecked(plm_buffer_t *self, int count);
+static inline int plm_buffer_read_bytes(plm_buffer_t *self, int count);
 void plm_buffer_align(plm_buffer_t *self);
+static inline void plm_buffer_skip_unchecked(plm_buffer_t *self, size_t count);
 void plm_buffer_skip(plm_buffer_t *self, size_t count);
 int plm_buffer_skip_bytes(plm_buffer_t *self, uint8_t v);
 int plm_buffer_next_start_code(plm_buffer_t *self);
@@ -1483,7 +1487,7 @@ void plm_buffer_seek(plm_buffer_t *self, size_t pos) {
 	self->has_ended = FALSE;
 
 	if (self->mode == PLM_BUFFER_MODE_FILE) {
-		fseek(self->fh, pos, SEEK_SET);
+		fseek(self->fh, (long) pos, SEEK_SET);
 		self->bit_index = 0;
 		self->length = 0;
 	}
@@ -1559,12 +1563,13 @@ int plm_buffer_has(plm_buffer_t *self, size_t count) {
 	return FALSE;
 }
 
-int plm_buffer_read(plm_buffer_t *self, int count) {
-	if (!plm_buffer_has(self, count)) {
-		return 0;
-	}
+static inline int plm_buffer_is_aligned(plm_buffer_t *self) {
+	return (self->bit_index & 7) == 0;
+}
 
+int plm_buffer_read_unchecked(plm_buffer_t *self, int count) {
 	int value = 0;
+
 	while (count) {
 		int current_byte = self->bytes[self->bit_index >> 3];
 
@@ -1573,7 +1578,7 @@ int plm_buffer_read(plm_buffer_t *self, int count) {
 		int shift = remaining - read;
 		int mask = (0xff >> (8 - read));
 
-		value = (value << read) | ((current_byte & (mask << shift)) >> shift);
+		value = (value << read) | ((current_byte >> shift) & mask);
 
 		self->bit_index += read;
 		count -= read;
@@ -1582,8 +1587,38 @@ int plm_buffer_read(plm_buffer_t *self, int count) {
 	return value;
 }
 
+static inline int plm_buffer_read(plm_buffer_t *self, int count) {
+	if (!plm_buffer_has(self, count)) {
+		return 0;
+	}
+	return plm_buffer_read_unchecked(self, count);
+}
+
+int plm_buffer_read_bytes_unchecked(plm_buffer_t *self, int count) {
+	int value = 0;
+	const uint8_t *byte = &self->bytes[self->bit_index >> 3];
+	self->bit_index += count * 8;
+	while (count) {
+		value = (value << 8) | *byte;
+		byte++;
+		count--;
+	}
+	return value;
+}
+
+static inline int plm_buffer_read_bytes(plm_buffer_t *self, int count) {
+	if (!plm_buffer_has(self, count * 8)) {
+		return 0;
+	}
+	return plm_buffer_is_aligned(self) ? plm_buffer_read_bytes_unchecked(self, count) : plm_buffer_read_unchecked(self, count * 8);
+}
+
 void plm_buffer_align(plm_buffer_t *self) {
 	self->bit_index = ((self->bit_index + 7) >> 3) << 3; // Align to next byte
+}
+
+static inline void plm_buffer_skip_unchecked(plm_buffer_t *self, size_t count) {
+	self->bit_index += count;
 }
 
 void plm_buffer_skip(plm_buffer_t *self, size_t count) {
@@ -1648,7 +1683,7 @@ int plm_buffer_peek_non_zero(plm_buffer_t *self, int bit_count) {
 		return FALSE;
 	}
 
-	int val = plm_buffer_read(self, bit_count);
+	int val = plm_buffer_read_unchecked(self, bit_count);
 	self->bit_index -= bit_count;
 	return val != 0;
 }
@@ -1743,14 +1778,14 @@ int plm_demux_has_headers(plm_demux_t *self) {
 		}
 		self->start_code = -1;
 
-		if (plm_buffer_read(self->buffer, 4) != 0x02) {
+		if (plm_buffer_read_unchecked(self->buffer, 4) != 0x02) {
 			return FALSE;
 		}
 
 		self->system_clock_ref = plm_demux_decode_time(self);
-		plm_buffer_skip(self->buffer, 1);
-		plm_buffer_skip(self->buffer, 22); // mux_rate * 50
-		plm_buffer_skip(self->buffer, 1);
+		plm_buffer_skip_unchecked(self->buffer, 1);
+		plm_buffer_skip_unchecked(self->buffer, 22); // mux_rate * 50
+		plm_buffer_skip_unchecked(self->buffer, 1);
 
 		self->has_pack_header = TRUE;
 	}
@@ -1770,11 +1805,11 @@ int plm_demux_has_headers(plm_demux_t *self) {
 		}
 		self->start_code = -1;
 
-		plm_buffer_skip(self->buffer, 16); // header_length
-		plm_buffer_skip(self->buffer, 24); // rate bound
-		self->num_audio_streams = plm_buffer_read(self->buffer, 6);
-		plm_buffer_skip(self->buffer, 5); // misc flags
-		self->num_video_streams = plm_buffer_read(self->buffer, 5);
+		plm_buffer_skip_unchecked(self->buffer, 16); // header_length
+		plm_buffer_skip_unchecked(self->buffer, 24); // rate bound
+		self->num_audio_streams = plm_buffer_read_unchecked(self->buffer, 6);
+		plm_buffer_skip_unchecked(self->buffer, 5); // misc flags
+		self->num_video_streams = plm_buffer_read_unchecked(self->buffer, 5);
 
 		self->has_system_header = TRUE;
 	}
@@ -1818,7 +1853,7 @@ double plm_demux_get_start_time(plm_demux_t *self, int type) {
 		return self->start_time;
 	}
 
-	int previous_pos = plm_buffer_tell(self->buffer);
+	size_t previous_pos = plm_buffer_tell(self->buffer);
 	int previous_start_code = self->start_code;
 	
 	// Find first video PTS
@@ -1856,7 +1891,7 @@ double plm_demux_get_duration(plm_demux_t *self, int type) {
 	long start_range = 64 * 1024;
 	long max_range = 4096 * 1024;
 	for (long range = start_range; range <= max_range; range *= 2) {
-		long seek_pos = file_size - range;
+		size_t seek_pos = file_size - range;
 		if (seek_pos < 0) {
 			seek_pos = 0;
 			range = max_range; // Make sure to bail after this round
@@ -1905,8 +1940,8 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 	// infinite loop. 32 retries should be enough for anybody.
 
 	double duration = plm_demux_get_duration(self, type);
-	long file_size = plm_buffer_get_size(self->buffer);
-	long byterate = file_size / duration;
+	size_t file_size = plm_buffer_get_size(self->buffer);
+	long byterate = (long) (file_size / duration);
 
 	double cur_time = self->last_decoded_pts;
 	double scan_span = 1;
@@ -1925,11 +1960,11 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 		long last_valid_packet_start = -1;
 		double first_packet_time = PLM_PACKET_INVALID_TS;
 
-		long cur_pos = plm_buffer_tell(self->buffer);
+		size_t cur_pos = plm_buffer_tell(self->buffer);
 
 		// Estimate byte offset and jump to it.
-		long offset = (seek_time - cur_time - scan_span) * byterate;
-		long seek_pos = cur_pos + offset;
+		long offset = (long) ((seek_time - cur_time - scan_span) * byterate);
+		size_t seek_pos = cur_pos + offset;
 		if (seek_pos < 0) {
 			seek_pos = 0;
 		}
@@ -1942,7 +1977,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 		// Scan through all packets up to the seek_time to find the last packet
 		// containing an intra frame.
 		while (plm_buffer_find_start_code(self->buffer, type) != -1) {
-			long packet_start = plm_buffer_tell(self->buffer);
+			size_t packet_start = plm_buffer_tell(self->buffer);
 			plm_packet_t *packet = plm_demux_decode_packet(self, type);
 
 			// Skip packet if it has no PTS
@@ -1956,7 +1991,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 			// iteration can be a bit more precise.
 			if (packet->pts > seek_time || packet->pts < seek_time - scan_span) {
 				found_packet_with_pts = TRUE;
-				byterate = (seek_pos - cur_pos) / (packet->pts - cur_time);
+				byterate = (long) ((seek_pos - cur_pos) / (packet->pts - cur_time));
 				cur_time = packet->pts;
 				break;
 			}
@@ -1987,7 +2022,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 						// Bits 11--13 in the picture header contain the frame 
 						// type, where 1=Intra
 						if ((packet->data[i + 5] & 0x38) == 8) {
-							last_valid_packet_start = packet_start;
+							last_valid_packet_start = (long) packet_start;
 						}
 						break;
 					}
@@ -1996,7 +2031,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 
 			// If we don't want intra frames, just use the last PTS found.
 			else {
-				last_valid_packet_start = packet_start;
+				last_valid_packet_start = (long) packet_start;
 			}
 		}
 
@@ -2018,7 +2053,7 @@ plm_packet_t *plm_demux_seek(plm_demux_t *self, double seek_time, int type, int 
 		// If we didn't find any packet with a PTS, it probably means we reached
 		// the end of the file. Estimate byterate and cur_time accordingly.
 		else if (!found_packet_with_pts) {
-			byterate = (seek_pos - cur_pos) / (duration - cur_time);
+			byterate = (long) ((seek_pos - cur_pos) / (duration - cur_time));
 			cur_time = duration;
 		}
 	}
@@ -2036,7 +2071,7 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self) {
 		if (!plm_buffer_has(self->buffer, bits_till_next_packet)) {
 			return NULL;
 		}
-		plm_buffer_skip(self->buffer, bits_till_next_packet);
+		plm_buffer_skip_unchecked(self->buffer, bits_till_next_packet);
 		self->current_packet.length = 0;
 	}
 
@@ -2067,12 +2102,15 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self) {
 }
 
 double plm_demux_decode_time(plm_demux_t *self) {
-	int64_t clock = plm_buffer_read(self->buffer, 3) << 30;
-	plm_buffer_skip(self->buffer, 1);
-	clock |= plm_buffer_read(self->buffer, 15) << 15;
-	plm_buffer_skip(self->buffer, 1);
-	clock |= plm_buffer_read(self->buffer, 15);
-	plm_buffer_skip(self->buffer, 1);
+	if (!plm_buffer_has(self->buffer, 36)) {
+		return 0.0;
+	}
+	int64_t clock = plm_buffer_read_unchecked(self->buffer, 3) << 30;
+	plm_buffer_skip_unchecked(self->buffer, 1);
+	clock |= plm_buffer_read_unchecked(self->buffer, 15) << 15;
+	plm_buffer_skip_unchecked(self->buffer, 1);
+	clock |= plm_buffer_read_unchecked(self->buffer, 15);
+	plm_buffer_skip_unchecked(self->buffer, 1);
 	return (double)clock / 90000.0;
 }
 
@@ -2084,16 +2122,20 @@ plm_packet_t *plm_demux_decode_packet(plm_demux_t *self, int type) {
 	self->start_code = -1;
 
 	self->next_packet.type = type;
-	self->next_packet.length = plm_buffer_read(self->buffer, 16);
+	self->next_packet.length = plm_buffer_is_aligned(self->buffer) ? plm_buffer_read_bytes_unchecked(self->buffer, 2) : plm_buffer_read_unchecked(self->buffer, 16);
 	self->next_packet.length -= plm_buffer_skip_bytes(self->buffer, 0xff); // stuffing
 
+	if (!plm_buffer_has(self->buffer, 20)) {
+		return NULL;
+	}
+
 	// skip P-STD
-	if (plm_buffer_read(self->buffer, 2) == 0x01) {
-		plm_buffer_skip(self->buffer, 16);
+	if (plm_buffer_read_unchecked(self->buffer, 2) == 0x01) {
+		plm_buffer_skip_unchecked(self->buffer, 16);
 		self->next_packet.length -= 2;
 	}
 
-	int pts_dts_marker = plm_buffer_read(self->buffer, 2);
+	int pts_dts_marker = plm_buffer_read_unchecked(self->buffer, 2);
 	if (pts_dts_marker == 0x03) {
 		self->next_packet.pts = plm_demux_decode_time(self);
 		self->last_decoded_pts = self->next_packet.pts;
@@ -2675,7 +2717,7 @@ double plm_video_get_time(plm_video_t *self) {
 }
 
 void plm_video_set_time(plm_video_t *self, double time) {
-	self->frames_decoded = self->framerate * time;
+	self->frames_decoded = (int) (self->framerate * time);
 	self->time = time;
 }
 
@@ -2733,7 +2775,7 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 			return NULL;
 		}
 		plm_buffer_discard_read_bytes(self->buffer);
-		
+
 		plm_video_decode_picture(self);
 
 		if (self->assume_no_b_frames) {
@@ -2782,26 +2824,34 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 		return FALSE;
 	}
 
-	self->width = plm_buffer_read(self->buffer, 12);
-	self->height = plm_buffer_read(self->buffer, 12);
+	self->width = plm_buffer_read_unchecked(self->buffer, 12);
+	self->height = plm_buffer_read_unchecked(self->buffer, 12);
 
 	if (self->width <= 0 || self->height <= 0) {
 		return FALSE;
 	}
 
 	// Skip pixel aspect ratio
-	plm_buffer_skip(self->buffer, 4);
+	plm_buffer_skip_unchecked(self->buffer, 4);
 
-	self->framerate = PLM_VIDEO_PICTURE_RATE[plm_buffer_read(self->buffer, 4)];
+	self->framerate = PLM_VIDEO_PICTURE_RATE[plm_buffer_read_unchecked(self->buffer, 4)];
 
 	// Skip bit_rate, marker, buffer_size and constrained bit
-	plm_buffer_skip(self->buffer, 18 + 1 + 10 + 1);
+	plm_buffer_skip_unchecked(self->buffer, 18 + 1 + 10 + 1);
 
 	// Load custom intra quant matrix?
-	if (plm_buffer_read(self->buffer, 1)) { 
-		for (int i = 0; i < 64; i++) {
-			int idx = PLM_VIDEO_ZIG_ZAG[i];
-			self->intra_quant_matrix[idx] = plm_buffer_read(self->buffer, 8);
+	if (plm_buffer_read_unchecked(self->buffer, 1)) {
+		if (plm_buffer_is_aligned(self->buffer)) {
+			for (int i = 0; i < 64; i++) {
+				int idx = PLM_VIDEO_ZIG_ZAG[i];
+				self->intra_quant_matrix[idx] = plm_buffer_read_bytes_unchecked(self->buffer, 1);
+			}
+		}
+		else {
+			for (int i = 0; i < 64; i++) {
+				int idx = PLM_VIDEO_ZIG_ZAG[i];
+				self->intra_quant_matrix[idx] = plm_buffer_read_unchecked(self->buffer, 8);
+			}
 		}
 	}
 	else {
@@ -2809,10 +2859,18 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 	}
 
 	// Load custom non intra quant matrix?
-	if (plm_buffer_read(self->buffer, 1)) { 
-		for (int i = 0; i < 64; i++) {
-			int idx = PLM_VIDEO_ZIG_ZAG[i];
-			self->non_intra_quant_matrix[idx] = plm_buffer_read(self->buffer, 8);
+	if (plm_buffer_read_unchecked(self->buffer, 1)) {
+		if (plm_buffer_is_aligned(self->buffer)) {
+			for (int i = 0; i < 64; i++) {
+				int idx = PLM_VIDEO_ZIG_ZAG[i];
+				self->non_intra_quant_matrix[idx] = plm_buffer_read_bytes_unchecked(self->buffer, 1);
+			}
+		} 
+		else {
+			for (int i = 0; i < 64; i++) {
+				int idx = PLM_VIDEO_ZIG_ZAG[i];
+				self->non_intra_quant_matrix[idx] = plm_buffer_read_unchecked(self->buffer, 8);
+			}
 		}
 	}
 	else {
@@ -2831,8 +2889,8 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 
 
 	// Allocate one big chunk of data for all 3 frames = 9 planes
-	size_t luma_plane_size = self->luma_width * self->luma_height;
-	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
+	size_t luma_plane_size = (size_t) self->luma_width * self->luma_height;
+	size_t chroma_plane_size = (size_t) self->chroma_width * self->chroma_height;
 	size_t frame_data_size = (luma_plane_size + 2 * chroma_plane_size);
 
 	self->frames_data = (uint8_t*)malloc(frame_data_size * 3);
@@ -2845,8 +2903,8 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 }
 
 void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base) {
-	size_t luma_plane_size = self->luma_width * self->luma_height;
-	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
+	size_t luma_plane_size = (size_t) self->luma_width * self->luma_height;
+	size_t chroma_plane_size = (size_t) self->chroma_width * self->chroma_height;
 
 	frame->width = self->width;
 	frame->height = self->height;
@@ -2864,9 +2922,12 @@ void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base) 
 }
 
 void plm_video_decode_picture(plm_video_t *self) {
-	plm_buffer_skip(self->buffer, 10); // skip temporalReference
-	self->picture_type = plm_buffer_read(self->buffer, 3);
-	plm_buffer_skip(self->buffer, 16); // skip vbv_delay
+	if (!plm_buffer_has(self->buffer, 29)) {
+		return;
+	}
+	plm_buffer_skip_unchecked(self->buffer, 10); // skip temporalReference
+	self->picture_type = plm_buffer_read_unchecked(self->buffer, 3);
+	plm_buffer_skip_unchecked(self->buffer, 16); // skip vbv_delay
 
 	// D frames or unknown coding type
 	if (self->picture_type <= 0 || self->picture_type > PLM_VIDEO_PICTURE_TYPE_B) {
@@ -2878,8 +2939,11 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE ||
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_B
 	) {
-		self->motion_forward.full_px = plm_buffer_read(self->buffer, 1);
-		int f_code = plm_buffer_read(self->buffer, 3);
+		if (!plm_buffer_has(self->buffer, 4)) {
+			return;
+		}
+		self->motion_forward.full_px = plm_buffer_read_unchecked(self->buffer, 1);
+		int f_code = plm_buffer_read_unchecked(self->buffer, 3);
 		if (f_code == 0) {
 			// Ignore picture with zero f_code
 			return;
@@ -2889,8 +2953,11 @@ void plm_video_decode_picture(plm_video_t *self) {
 
 	// Backward full_px, f_code
 	if (self->picture_type == PLM_VIDEO_PICTURE_TYPE_B) {
-		self->motion_backward.full_px = plm_buffer_read(self->buffer, 1);
-		int f_code = plm_buffer_read(self->buffer, 3);
+		if (!plm_buffer_has(self->buffer, 4)) {
+			return;
+		}
+		self->motion_backward.full_px = plm_buffer_read_unchecked(self->buffer, 1);
+		int f_code = plm_buffer_read_unchecked(self->buffer, 3);
 		if (f_code == 0) {
 			// Ignore picture with zero f_code
 			return;
@@ -3262,12 +3329,12 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		if (coeff == 0xffff) {
 			// escape
 			run = plm_buffer_read(self->buffer, 6);
-			level = plm_buffer_read(self->buffer, 8);
+			level = plm_buffer_read_bytes(self->buffer, 1);
 			if (level == 0) {
-				level = plm_buffer_read(self->buffer, 8);
+				level = plm_buffer_read_bytes(self->buffer, 1);
 			}
 			else if (level == 128) {
-				level = plm_buffer_read(self->buffer, 8) - 256;
+				level = plm_buffer_read_bytes(self->buffer, 1) - 256;
 			}
 			else if (level > 128) {
 				level = level - 256;
@@ -3610,10 +3677,10 @@ static const uint8_t PLM_AUDIO_QUANT_LUT_STEP_1[2][16] = {
 };
 
 // Quantizer lookup, step 2: bitrate class, sample rate -> B2 table idx, sblimit
-static const uint8_t PLM_AUDIO_QUANT_TAB_A = (27 | 64);   // Table 3-B.2a: high-rate, sblimit = 27
-static const uint8_t PLM_AUDIO_QUANT_TAB_B = (30 | 64);   // Table 3-B.2b: high-rate, sblimit = 30
-static const uint8_t PLM_AUDIO_QUANT_TAB_C = 8;           // Table 3-B.2c:  low-rate, sblimit =  8
-static const uint8_t PLM_AUDIO_QUANT_TAB_D = 12;          // Table 3-B.2d:  low-rate, sblimit = 12
+#define PLM_AUDIO_QUANT_TAB_A (27 | 64)   // Table 3-B.2a: high-rate, sblimit = 27
+#define PLM_AUDIO_QUANT_TAB_B (30 | 64)   // Table 3-B.2b: high-rate, sblimit = 30
+#define PLM_AUDIO_QUANT_TAB_C 8           // Table 3-B.2c:  low-rate, sblimit =  8
+#define PLM_AUDIO_QUANT_TAB_D 12          // Table 3-B.2d:  low-rate, sblimit = 12
 
 static const uint8_t QUANT_LUT_STEP_2[3][3] = {
 	//44.1 kHz,              48 kHz,                32 kHz
@@ -3761,8 +3828,8 @@ double plm_audio_get_time(plm_audio_t *self) {
 }
 
 void plm_audio_set_time(plm_audio_t *self, double time) {
-	self->samples_decoded = time * 
-		(double)PLM_AUDIO_SAMPLE_RATE[self->samplerate_index];
+	self->samples_decoded = (int) (time * 
+		(double)PLM_AUDIO_SAMPLE_RATE[self->samplerate_index]);
 	self->time = time;
 }
 
@@ -3840,9 +3907,13 @@ int plm_audio_decode_header(plm_audio_t *self) {
 		return 0;
 	}
 
-	self->version = plm_buffer_read(self->buffer, 2);
-	self->layer = plm_buffer_read(self->buffer, 2);
-	int hasCRC = !plm_buffer_read(self->buffer, 1);
+	if (!plm_buffer_has(self->buffer, 15)) {
+		return 0;
+	}
+
+	self->version = plm_buffer_read_unchecked(self->buffer, 2);
+	self->layer = plm_buffer_read_unchecked(self->buffer, 2);
+	int hasCRC = !plm_buffer_read_unchecked(self->buffer, 1);
 
 	if (
 		self->version != PLM_AUDIO_MPEG_1 ||
@@ -3851,19 +3922,19 @@ int plm_audio_decode_header(plm_audio_t *self) {
 		return 0;
 	}
 
-	int bitrate_index = plm_buffer_read(self->buffer, 4) - 1;
+	int bitrate_index = plm_buffer_read_unchecked(self->buffer, 4) - 1;
 	if (bitrate_index > 13) {
 		return 0;
 	}
 
-	int samplerate_index = plm_buffer_read(self->buffer, 2);
+	int samplerate_index = plm_buffer_read_unchecked(self->buffer, 2);
 	if (samplerate_index == 3) {
 		return 0;
 	}
 
-	int padding = plm_buffer_read(self->buffer, 1);
-	plm_buffer_skip(self->buffer, 1); // f_private
-	int mode = plm_buffer_read(self->buffer, 2);
+	int padding = plm_buffer_read_unchecked(self->buffer, 1);
+	plm_buffer_skip_unchecked(self->buffer, 1); // f_private
+	int mode = plm_buffer_read_unchecked(self->buffer, 2);
 
 	// If we already have a header, make sure the samplerate, bitrate and mode
 	// are still the same, otherwise we might have missed sync.
@@ -3952,14 +4023,18 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 				int *sf = self->scale_factor[ch][sb];
 				switch (self->scale_factor_info[ch][sb]) {
 					case 0:
-						sf[0] = plm_buffer_read(self->buffer, 6);
-						sf[1] = plm_buffer_read(self->buffer, 6);
-						sf[2] = plm_buffer_read(self->buffer, 6);
+						if (plm_buffer_has(self->buffer, 18)) {
+							sf[0] = plm_buffer_read_unchecked(self->buffer, 6);
+							sf[1] = plm_buffer_read_unchecked(self->buffer, 6);
+							sf[2] = plm_buffer_read_unchecked(self->buffer, 6);
+						}
 						break;
 					case 1:
-						sf[0] = 
-						sf[1] = plm_buffer_read(self->buffer, 6);
-						sf[2] = plm_buffer_read(self->buffer, 6);
+						if (plm_buffer_has(self->buffer, 12)) {
+							sf[0] =
+							sf[1] = plm_buffer_read_unchecked(self->buffer, 6);
+							sf[2] = plm_buffer_read_unchecked(self->buffer, 6);
+						}
 						break;
 					case 2:
 						sf[0] = 
@@ -3967,9 +4042,11 @@ void plm_audio_decode_frame(plm_audio_t *self) {
 						sf[2] = plm_buffer_read(self->buffer, 6);
 						break;
 					case 3:
-						sf[0] = plm_buffer_read(self->buffer, 6);
-						sf[1] = 
-						sf[2] = plm_buffer_read(self->buffer, 6);
+						if (plm_buffer_has(self->buffer, 12)) {
+							sf[0] = plm_buffer_read_unchecked(self->buffer, 6);
+							sf[1] =
+							sf[2] = plm_buffer_read_unchecked(self->buffer, 6);
+						}
 						break;
 				}
 			}
@@ -4102,9 +4179,11 @@ void plm_audio_read_samples(plm_audio_t *self, int ch, int sb, int part) {
 	}
 	else {
 		// Decode direct samples
-		sample[0] = plm_buffer_read(self->buffer, q->bits);
-		sample[1] = plm_buffer_read(self->buffer, q->bits);
-		sample[2] = plm_buffer_read(self->buffer, q->bits);
+		if (plm_buffer_has(self->buffer, q->bits)) {
+			sample[0] = plm_buffer_read_unchecked(self->buffer, q->bits);
+			sample[1] = plm_buffer_read_unchecked(self->buffer, q->bits);
+			sample[2] = plm_buffer_read_unchecked(self->buffer, q->bits);
+		}
 	}
 
 	// Postmultiply samples
