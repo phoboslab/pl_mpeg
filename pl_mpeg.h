@@ -278,13 +278,13 @@ typedef void(*plm_buffer_load_callback)(plm_buffer_t *self, void *user);
 // Create a plmpeg instance with a filename. Returns NULL if the file could not
 // be opened.
 
-plm_t *plm_create_with_filename(const char *filename);
+plm_t *plm_create_with_filename(const char *filename, int luma_only);
 
 
 // Create a plmpeg instance with a file handle. Pass TRUE to close_when_done to
 // let plmpeg call fclose() on the handle when plm_destroy() is called.
 
-plm_t *plm_create_with_file(FILE *fh, int close_when_done);
+plm_t *plm_create_with_file(FILE *fh, int close_when_done, int luma_only);
 
 
 // Create a plmpeg instance with a pointer to memory as source. This assumes the
@@ -292,14 +292,14 @@ plm_t *plm_create_with_file(FILE *fh, int close_when_done);
 // free_when_done to let plmpeg call free() on the pointer when plm_destroy() 
 // is called.
 
-plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done);
+plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done, int luma_only);
 
 
 // Create a plmpeg instance with a plm_buffer as source. Pass TRUE to
 // destroy_when_done to let plmpeg call plm_buffer_destroy() on the buffer when
 // plm_destroy() is called.
 
-plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
+plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done, int luma_only);
 
 
 // Destroy a plmpeg instance and free all data.
@@ -647,7 +647,7 @@ plm_packet_t *plm_demux_decode(plm_demux_t *self);
 
 // Create a video decoder with a plm_buffer as source.
 
-plm_video_t *plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
+plm_video_t *plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done, int luma_only);
 
 
 // Destroy a video decoder and free all data.
@@ -824,6 +824,7 @@ struct plm_t {
 	int has_decoders;
 
 	int video_enabled;
+	int luma_only;
 	int video_packet_type;
 	plm_buffer_t *video_buffer;
 	plm_video_t *video_decoder;
@@ -848,28 +849,29 @@ void plm_read_video_packet(plm_buffer_t *buffer, void *user);
 void plm_read_audio_packet(plm_buffer_t *buffer, void *user);
 void plm_read_packets(plm_t *self, int requested_type);
 
-plm_t *plm_create_with_filename(const char *filename) {
+plm_t *plm_create_with_filename(const char *filename, int luma_only) {
 	plm_buffer_t *buffer = plm_buffer_create_with_filename(filename);
 	if (!buffer) {
 		return NULL;
 	}
-	return plm_create_with_buffer(buffer, TRUE);
+	return plm_create_with_buffer(buffer, TRUE, luma_only);
 }
 
-plm_t *plm_create_with_file(FILE *fh, int close_when_done) {
+plm_t *plm_create_with_file(FILE *fh, int close_when_done, int luma_only) {
 	plm_buffer_t *buffer = plm_buffer_create_with_file(fh, close_when_done);
-	return plm_create_with_buffer(buffer, TRUE);
+	return plm_create_with_buffer(buffer, TRUE, luma_only);
 }
 
-plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done) {
+plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done, int luma_only) {
 	plm_buffer_t *buffer = plm_buffer_create_with_memory(bytes, length, free_when_done);
-	return plm_create_with_buffer(buffer, TRUE);
+	return plm_create_with_buffer(buffer, TRUE, luma_only);
 }
 
-plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done) {
+plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done, int luma_only) {
 	plm_t *self = (plm_t *)PLM_MALLOC(sizeof(plm_t));
 	memset(self, 0, sizeof(plm_t));
 
+	self->luma_only = luma_only;
 	self->demux = plm_demux_create(buffer, destroy_when_done);
 	self->video_enabled = TRUE;
 	self->audio_enabled = TRUE;
@@ -904,7 +906,7 @@ int plm_init_decoders(plm_t *self) {
 	}
 
 	if (self->video_buffer) {
-		self->video_decoder = plm_video_create_with_buffer(self->video_buffer, TRUE);
+		self->video_decoder = plm_video_create_with_buffer(self->video_buffer, TRUE, self->luma_only);
 	}
 
 	if (self->audio_buffer) {
@@ -2556,6 +2558,7 @@ typedef struct {
 struct plm_video_t {
 	double framerate;
 	double time;
+	int luma_only;
 	int frames_decoded;
 	int width;
 	int height;
@@ -2630,12 +2633,13 @@ void plm_video_process_macroblock(plm_video_t *self, uint8_t *s, uint8_t *d, int
 void plm_video_decode_block(plm_video_t *self, int block);
 void plm_video_idct(int *block);
 
-plm_video_t * plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done) {
+plm_video_t * plm_video_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done, int luma_only) {
 	plm_video_t *self = (plm_video_t *)PLM_MALLOC(sizeof(plm_video_t));
 	memset(self, 0, sizeof(plm_video_t));
 	
 	self->buffer = buffer;
 	self->destroy_buffer_when_done = destroy_when_done;
+	self->luma_only = luma_only;
 
 	// Attempt to decode the sequence header
 	self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_SEQUENCE);
@@ -2835,13 +2839,18 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 	self->luma_width = self->mb_width << 4;
 	self->luma_height = self->mb_height << 4;
 
-	self->chroma_width = self->mb_width << 3;
-	self->chroma_height = self->mb_height << 3;
-
+	if (self->luma_only) {
+		self->chroma_width = 0;
+		self->chroma_height = 0;
+	}
+	else {
+		self->chroma_width = self->mb_width << 3;
+		self->chroma_height = self->mb_height << 3;
+	}
 
 	// Allocate one big chunk of data for all 3 frames = 9 planes
-	size_t luma_plane_size = self->luma_width * self->luma_height;
-	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
+	size_t luma_plane_size = (size_t) self->luma_width * self->luma_height;
+	size_t chroma_plane_size = (size_t) self->chroma_width * self->chroma_height;
 	size_t frame_data_size = (luma_plane_size + 2 * chroma_plane_size);
 
 	self->frames_data = (uint8_t*)PLM_MALLOC(frame_data_size * 3);
@@ -2854,8 +2863,8 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 }
 
 void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base) {
-	size_t luma_plane_size = self->luma_width * self->luma_height;
-	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
+	size_t luma_plane_size = (size_t) self->luma_width * self->luma_height;
+	size_t chroma_plane_size = (size_t) self->chroma_width * self->chroma_height;
 
 	frame->width = self->width;
 	frame->height = self->height;
@@ -3154,15 +3163,19 @@ void plm_video_predict_macroblock(plm_video_t *self) {
 void plm_video_copy_macroblock(plm_video_t *self, plm_frame_t *s, int motion_h, int motion_v) {
 	plm_frame_t *d = &self->frame_current;
 	plm_video_process_macroblock(self, s->y.data, d->y.data, motion_h, motion_v, 16, FALSE);
-	plm_video_process_macroblock(self, s->cr.data, d->cr.data, motion_h / 2, motion_v / 2, 8, FALSE);
-	plm_video_process_macroblock(self, s->cb.data, d->cb.data, motion_h / 2, motion_v / 2, 8, FALSE);
+	if (!self->luma_only) {
+		plm_video_process_macroblock(self, s->cr.data, d->cr.data, motion_h / 2, motion_v / 2, 8, FALSE);
+		plm_video_process_macroblock(self, s->cb.data, d->cb.data, motion_h / 2, motion_v / 2, 8, FALSE);
+	}
 }
 
 void plm_video_interpolate_macroblock(plm_video_t *self, plm_frame_t *s, int motion_h, int motion_v) {
 	plm_frame_t *d = &self->frame_current;
 	plm_video_process_macroblock(self, s->y.data, d->y.data, motion_h, motion_v, 16, TRUE);
-	plm_video_process_macroblock(self, s->cr.data, d->cr.data, motion_h / 2, motion_v / 2, 8, TRUE);
-	plm_video_process_macroblock(self, s->cb.data, d->cb.data, motion_h / 2, motion_v / 2, 8, TRUE);
+	if (!self->luma_only) {
+		plm_video_process_macroblock(self, s->cr.data, d->cr.data, motion_h / 2, motion_v / 2, 8, TRUE);
+		plm_video_process_macroblock(self, s->cb.data, d->cb.data, motion_h / 2, motion_v / 2, 8, TRUE);
+	}
 }
 
 #define PLM_BLOCK_SET(DEST, DEST_INDEX, DEST_WIDTH, SOURCE_INDEX, SOURCE_WIDTH, BLOCK_SIZE, OP) do { \
@@ -3346,12 +3359,14 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		// Overwrite (no prediction)
 		if (n == 1) {
 			int clamped = plm_clamp((s[0] + 128) >> 8);
-			PLM_BLOCK_SET(d, di, dw, si, 8, 8, clamped);
+			if (dw > 0)
+				PLM_BLOCK_SET(d, di, dw, si, 8, 8, clamped);
 			s[0] = 0;
 		}
 		else {
 			plm_video_idct(s);
-			PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(s[si]));
+			if (dw > 0)
+				PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(s[si]));
 			memset(self->block_data, 0, sizeof(self->block_data));
 		}
 	}
@@ -3359,12 +3374,14 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		// Add data to the predicted macroblock
 		if (n == 1) {
 			int value = (s[0] + 128) >> 8;
-			PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(d[di] + value));
+			if (dw > 0)
+				PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(d[di] + value));
 			s[0] = 0;
 		}
 		else {
 			plm_video_idct(s);
-			PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(d[di] + s[si]));
+			if (dw > 0)
+				PLM_BLOCK_SET(d, di, dw, si, 8, 8, plm_clamp(d[di] + s[si]));
 			memset(self->block_data, 0, sizeof(self->block_data));
 		}
 	}
