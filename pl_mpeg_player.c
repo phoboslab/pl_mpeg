@@ -183,6 +183,11 @@ app_t * app_create(const char *filename, int texture_mode) {
 		exit(1);
 	}
 
+	if (!plm_probe(self->plm, 5000 * 1024)) {
+		SDL_Log("No MPEG video or audio streams found in %s", filename);
+		exit(1);
+	}
+
 	int samplerate = plm_get_samplerate(self->plm);
 
 	SDL_Log(

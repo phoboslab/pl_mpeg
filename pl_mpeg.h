@@ -307,13 +307,28 @@ plm_t *plm_create_with_buffer(plm_buffer_t *buffer, int destroy_when_done);
 void plm_destroy(plm_t *self);
 
 
-// Get whether we have headers on all available streams and we can accurately
-// report the number of video/audio streams, video dimensions, framerate and
-// audio samplerate.
+// Get whether we have headers on all available streams and we can report the 
+// number of video/audio streams, video dimensions, framerate and audio 
+// samplerate.
 // This returns FALSE if the file is not an MPEG-PS file or - when not using a
 // file as source - when not enough data is available yet.
 
 int plm_has_headers(plm_t *self);
+
+
+// Probe the MPEG-PS data to find the actual number of video and audio streams
+// within the buffer. For certain files (e.g. VideoCD) this can be more accurate
+// than just reading the number of streams from the headers.
+// This should only be used when the underlying plm_buffer is seekable, i.e. for 
+// files, fixed memory buffers or _for_appending buffers. If used with dynamic
+// memory buffers it will skip decoding the probesize!
+// The necessary probesize is dependent on the files you expect to read. Usually
+// a few hundred KB should be enough to find all streams.
+// Use plm_get_num_{audio|video}_streams() afterwards to get the number of 
+// streams in the file.
+// Returns TRUE if any streams were found within the probesize.
+
+int plm_probe(plm_t *self, size_t probesize);
 
 
 // Get or set whether video decoding is enabled. Default TRUE.
@@ -587,6 +602,12 @@ void plm_demux_destroy(plm_demux_t *self);
 // attempt to read the headers if non are present yet.
 
 int plm_demux_has_headers(plm_demux_t *self);
+
+
+// Probe the file for the actual number of video/audio streams. See
+// plm_probe() for the details.
+
+int plm_demux_probe(plm_demux_t *self, size_t probesize);
 
 
 // Returns the number of video streams found in the system header. This will
@@ -891,24 +912,22 @@ int plm_init_decoders(plm_t *self) {
 		if (self->video_enabled) {
 			self->video_packet_type = PLM_DEMUX_PACKET_VIDEO_1;
 		}
-		self->video_buffer = plm_buffer_create_with_capacity(PLM_BUFFER_DEFAULT_SIZE);
-		plm_buffer_set_load_callback(self->video_buffer, plm_read_video_packet, self);
+		if (!self->video_decoder) {
+			self->video_buffer = plm_buffer_create_with_capacity(PLM_BUFFER_DEFAULT_SIZE);
+			plm_buffer_set_load_callback(self->video_buffer, plm_read_video_packet, self);
+			self->video_decoder = plm_video_create_with_buffer(self->video_buffer, TRUE);
+		}
 	}
 
 	if (plm_demux_get_num_audio_streams(self->demux) > 0) {
 		if (self->audio_enabled) {
 			self->audio_packet_type = PLM_DEMUX_PACKET_AUDIO_1 + self->audio_stream_index;
 		}
-		self->audio_buffer = plm_buffer_create_with_capacity(PLM_BUFFER_DEFAULT_SIZE);
-		plm_buffer_set_load_callback(self->audio_buffer, plm_read_audio_packet, self);
-	}
-
-	if (self->video_buffer) {
-		self->video_decoder = plm_video_create_with_buffer(self->video_buffer, TRUE);
-	}
-
-	if (self->audio_buffer) {
-		self->audio_decoder = plm_audio_create_with_buffer(self->audio_buffer, TRUE);
+		if (!self->audio_decoder) {
+			self->audio_buffer = plm_buffer_create_with_capacity(PLM_BUFFER_DEFAULT_SIZE);
+			plm_buffer_set_load_callback(self->audio_buffer, plm_read_audio_packet, self);
+			self->audio_decoder = plm_audio_create_with_buffer(self->audio_buffer, TRUE);
+		}
 	}
 
 	self->has_decoders = TRUE;
@@ -948,6 +967,19 @@ int plm_has_headers(plm_t *self) {
 	}
 
 	return TRUE;
+}
+
+int plm_probe(plm_t *self, size_t probesize) {
+	int found_streams = plm_demux_probe(self->demux, probesize);
+	if (!found_streams) {
+		return FALSE;
+	}
+
+	// Re-init decoders
+	self->has_decoders = FALSE;
+	self->video_packet_type = 0;
+	self->audio_packet_type = 0;
+	return plm_init_decoders(self);
 }
 
 void plm_set_audio_enabled(plm_t *self, int enabled) {
@@ -1790,6 +1822,39 @@ int plm_demux_has_headers(plm_demux_t *self) {
 
 	self->has_headers = TRUE;
 	return TRUE;
+}
+
+int plm_demux_probe(plm_demux_t *self, size_t probesize) {
+	int previous_pos = plm_buffer_tell(self->buffer);
+
+	int video_stream = FALSE;
+	int audio_streams[4] = {FALSE, FALSE, FALSE, FALSE};
+	do {
+		self->start_code = plm_buffer_next_start_code(self->buffer);
+		if (self->start_code == PLM_DEMUX_PACKET_VIDEO_1) {
+			video_stream = TRUE;
+		}
+		else if (
+			self->start_code >= PLM_DEMUX_PACKET_AUDIO_1 && 
+			self->start_code <= PLM_DEMUX_PACKET_AUDIO_4
+		) {
+			audio_streams[self->start_code - PLM_DEMUX_PACKET_AUDIO_1] = TRUE;
+		}
+	} while (
+		self->start_code != -1 && 
+		plm_buffer_tell(self->buffer) - previous_pos < probesize
+	);
+
+	self->num_video_streams = video_stream ? 1 : 0;
+	self->num_audio_streams = 0;
+	for (int i = 0; i < 4; i++) {
+		if (audio_streams[i]) {
+			self->num_audio_streams++;
+		}
+	}
+
+	plm_demux_buffer_seek(self, previous_pos);
+	return (self->num_video_streams || self->num_audio_streams);
 }
 
 int plm_demux_get_num_video_streams(plm_demux_t *self) {
