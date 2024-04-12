@@ -583,7 +583,7 @@ static const int PLM_DEMUX_PACKET_PRIVATE = 0xBD;
 static const int PLM_DEMUX_PACKET_AUDIO_1 = 0xC0;
 static const int PLM_DEMUX_PACKET_AUDIO_2 = 0xC1;
 static const int PLM_DEMUX_PACKET_AUDIO_3 = 0xC2;
-static const int PLM_DEMUX_PACKET_AUDIO_4 = 0xC2;
+static const int PLM_DEMUX_PACKET_AUDIO_4 = 0xC3;
 static const int PLM_DEMUX_PACKET_VIDEO_1 = 0xE0;
 
 
