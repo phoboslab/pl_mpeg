@@ -2890,16 +2890,18 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 	int pixel_aspect_ratio_code;
 	pixel_aspect_ratio_code = plm_buffer_read(self->buffer, 4);
 	pixel_aspect_ratio_code -= 1;
-	if (pixel_aspect_ratio_code < 0)
+	if (pixel_aspect_ratio_code < 0) {
 		pixel_aspect_ratio_code = 0;
+	}
 	int par_last = (sizeof(PLM_VIDEO_PIXEL_ASPECT_RATIO) /
 			sizeof(PLM_VIDEO_PIXEL_ASPECT_RATIO[0]) - 1);
-	if (pixel_aspect_ratio_code > par_last)
+	if (pixel_aspect_ratio_code > par_last) {
 		pixel_aspect_ratio_code = par_last;
+	}
 	self->pixel_aspect_ratio =
 		PLM_VIDEO_PIXEL_ASPECT_RATIO[pixel_aspect_ratio_code];
 
-        // Get frame rate
+	// Get frame rate
 	self->framerate = PLM_VIDEO_PICTURE_RATE[plm_buffer_read(self->buffer, 4)];
 
 	// Skip bit_rate, marker, buffer_size and constrained bit
@@ -3398,7 +3400,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		n++;
 
 		// Dequantize, oddify, clip
-                level = (unsigned)level << 1;
+		level = (unsigned)level << 1;
 		if (!self->macroblock_intra) {
 			level += (level < 0 ? -1 : 1);
 		}
