@@ -346,6 +346,7 @@ int plm_get_num_video_streams(plm_t *self);
 
 int plm_get_width(plm_t *self);
 int plm_get_height(plm_t *self);
+double plm_get_pixel_aspect_ratio(plm_t *self);
 
 
 // Get the framerate of the video stream in frames per second.
@@ -685,6 +686,7 @@ int plm_video_has_header(plm_video_t *self);
 // Get the framerate in frames per second.
 
 double plm_video_get_framerate(plm_video_t *self);
+double plm_video_get_pixel_aspect_ratio(plm_video_t *self);
 
 
 // Get the display width/height.
@@ -1041,6 +1043,12 @@ int plm_get_height(plm_t *self) {
 double plm_get_framerate(plm_t *self) {
 	return (plm_init_decoders(self) && self->video_decoder)
 		? plm_video_get_framerate(self->video_decoder)
+		: 0;
+}
+
+double plm_get_pixel_aspect_ratio(plm_t *self) {
+	return (plm_init_decoders(self) && self->video_decoder)
+		? plm_video_get_pixel_aspect_ratio(self->video_decoder)
 		: 0;
 }
 
@@ -2227,6 +2235,14 @@ static const int PLM_START_USER_DATA = 0xB2;
 #define PLM_START_IS_SLICE(c) \
 	(c >= PLM_START_SLICE_FIRST && c <= PLM_START_SLICE_LAST)
 
+static const float PLM_VIDEO_PIXEL_ASPECT_RATIO[] = {
+	1.0000, /* square pixels */
+	0.6735, /* 3:4? */
+	0.7031, /* MPEG-1 / MPEG-2 video encoding divergence? */
+	0.7615, 0.8055, 0.8437, 0.8935, 0.9157, 0.9815,
+	1.0255, 1.0695, 1.0950, 1.1575, 1.2051,
+};
+
 static const double PLM_VIDEO_PICTURE_RATE[] = {
 	0.000, 23.976, 24.000, 25.000, 29.970, 30.000, 50.000, 59.940,
 	60.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000
@@ -2620,6 +2636,7 @@ typedef struct {
 
 struct plm_video_t {
 	double framerate;
+	double pixel_aspect_ratio;
 	double time;
 	int frames_decoded;
 	int width;
@@ -2725,6 +2742,12 @@ void plm_video_destroy(plm_video_t *self) {
 double plm_video_get_framerate(plm_video_t *self) {
 	return plm_video_has_header(self)
 		? self->framerate
+		: 0;
+}
+
+double plm_video_get_pixel_aspect_ratio(plm_video_t *self) {
+	return plm_video_has_header(self)
+		? self->pixel_aspect_ratio
 		: 0;
 }
 
@@ -2863,9 +2886,20 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 		return FALSE;
 	}
 
-	// Skip pixel aspect ratio
-	plm_buffer_skip(self->buffer, 4);
+	// Get pixel aspect ratio
+	int pixel_aspect_ratio_code;
+	pixel_aspect_ratio_code = plm_buffer_read(self->buffer, 4);
+	pixel_aspect_ratio_code -= 1;
+	if (pixel_aspect_ratio_code < 0)
+		pixel_aspect_ratio_code = 0;
+	int par_last = (sizeof(PLM_VIDEO_PIXEL_ASPECT_RATIO) /
+			sizeof(PLM_VIDEO_PIXEL_ASPECT_RATIO[0]) - 1);
+	if (pixel_aspect_ratio_code > par_last)
+		pixel_aspect_ratio_code = par_last;
+	self->pixel_aspect_ratio =
+		PLM_VIDEO_PIXEL_ASPECT_RATIO[pixel_aspect_ratio_code];
 
+        // Get frame rate
 	self->framerate = PLM_VIDEO_PICTURE_RATE[plm_buffer_read(self->buffer, 4)];
 
 	// Skip bit_rate, marker, buffer_size and constrained bit
