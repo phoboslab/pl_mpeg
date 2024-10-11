@@ -1,33 +1,13 @@
 /*
 PL_MPEG Example - Video player using SDL2/OpenGL for rendering
+SPDX-License-Identifier: MIT
 
 Dominic Szablewski - https://phoboslab.org
 
 
--- LICENSE: The MIT License(MIT)
-
-Copyright(c) 2019 Dominic Szablewski
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files(the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and / or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions :
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-
 -- Usage
 
-plmpeg-player <video-file.mpg>
+pl_mpeg_player_gl <video-file.mpg>
 
 Use the arrow keys to seek forward/backward by 3 seconds. Click anywhere on the
 window to seek to seek through the whole file.
@@ -429,7 +409,7 @@ void app_on_audio(plm_t *mpeg, plm_samples_t *samples, void *user) {
 
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
-		SDL_Log("Usage: pl_mpeg_player <file.mpg>");
+		SDL_Log("Usage: pl_mpeg_player_gl <file.mpg>");
 		exit(1);
 	}
 	
