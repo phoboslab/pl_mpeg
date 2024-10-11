@@ -1,10 +1,7 @@
 # By default, this makefile builds 3 example applications for pl_mpeg
-# - pl_mpeg_extract_frames: a command line tool that dumps all frames into PNGs
+# - pl_mpeg_extract_frames: a command line tool that dumps all frames into BMPs
 # - pl_mpeg_player_gl: a video player using SDL2 and OpenGL
 # - pl_mpeg_player_sdl: a video player using SDL2 and it's built-in 2d renderer
-
-# pl_mpeg_extract_frames requires the stb_image_write.h from
-# https://github.com/nothings/stb/blob/master/stb_image_write.h
 
 # The players require the SDL2 library to be installed. Please note that the 
 # linker flags for the GL version have only been tested on Linux. PRs welcome!
