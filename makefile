@@ -45,7 +45,7 @@ extract: $(TARGET_EXTRACT)
 player_sdl: $(TARGET_SDL)
 player_gl: $(TARGET_GL)
 
-$(TARGET_EXTRACT):pl_mpeg_extract_frames.c pl_mpeg.h stb_image_write.h
+$(TARGET_EXTRACT):pl_mpeg_extract_frames.c pl_mpeg.h
 	$(CC) $(CFLAGS) pl_mpeg_extract_frames.c -o $(TARGET_EXTRACT) $(LFLAGS)
 
 $(TARGET_SDL):pl_mpeg_player_sdl.c pl_mpeg.h
