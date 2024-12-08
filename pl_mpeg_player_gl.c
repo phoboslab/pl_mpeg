@@ -69,11 +69,12 @@ steps combined.
 #define APP_SHADER_SOURCE(...) #__VA_ARGS__
 
 const char * const APP_VERTEX_SHADER = APP_SHADER_SOURCE(
+	uniform vec2 texture_crop_size;
 	attribute vec2 vertex;
 	varying vec2 tex_coord;
 	
 	void main() {
-		tex_coord = vertex;
+		tex_coord = vertex * texture_crop_size;
 		gl_Position = vec4((vertex * 2.0 - 1.0) * vec2(1, -1), 0.0, 1.0);
 	}
 );
@@ -132,6 +133,7 @@ typedef struct {
 	GLuint texture_y;
 	GLuint texture_cb;
 	GLuint texture_cr;
+	GLuint texture_crop_size;
 	
 	GLuint texture_rgb;
 	uint8_t *rgb_data;
@@ -251,6 +253,7 @@ app_t * app_create(const char *filename, int texture_mode) {
 		int num_pixels = plm_get_width(self->plm) * plm_get_height(self->plm);
 		self->rgb_data = (uint8_t*)malloc(num_pixels * 3);
 	}
+	self->texture_crop_size = glGetUniformLocation(self->shader_program, "texture_crop_size");
 	
 	return self;
 }
@@ -331,7 +334,7 @@ void app_update(app_t *self) {
 	}
 	
 	glClear(GL_COLOR_BUFFER_BIT);
-	glRectf(0.0, 0.0, 1.0, 1.0);
+	glRectf(0.0, 0.0, 1.0, 1.5);
 	SDL_GL_SwapWindow(self->window);
 }
 
@@ -384,6 +387,13 @@ void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
 		app_update_texture(self, GL_TEXTURE0, self->texture_y, &frame->y);
 		app_update_texture(self, GL_TEXTURE1, self->texture_cb, &frame->cb);
 		app_update_texture(self, GL_TEXTURE2, self->texture_cr, &frame->cr);
+
+		// The dimensions of the planes are always rounded up to the next
+		// multiple of 16. We don't want to display these extra pixels, so
+		// calculate the crop w/h and hand it over to the shader program.
+		float cw = (float)frame->width / (float)frame->y.width;
+		float ch = (float)frame->height / (float)frame->y.height;
+		glUniform2f(self->texture_crop_size, cw, ch);
 	}
 	else {
 		plm_frame_to_rgb(frame, self->rgb_data, frame->width * 3);
@@ -393,6 +403,10 @@ void app_on_video(plm_t *mpeg, plm_frame_t *frame, void *user) {
 			GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0,
 			GL_RGB, GL_UNSIGNED_BYTE, self->rgb_data
 		);
+
+		// plm_frame_to_rgb() always returns the cropped portion of the display
+		// size, so the crop size is always 1.0, 1.0
+		glUniform2f(self->texture_crop_size, 1.0, 1.0);
 	}
 }
 
