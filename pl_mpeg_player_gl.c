@@ -334,7 +334,7 @@ void app_update(app_t *self) {
 	}
 	
 	glClear(GL_COLOR_BUFFER_BIT);
-	glRectf(0.0, 0.0, 1.0, 1.5);
+	glRectf(0.0, 0.0, 1.0, 1.0);
 	SDL_GL_SwapWindow(self->window);
 }
 
