@@ -15,7 +15,7 @@ Images named 000001.bmp, 000002.bmp... will be created in the current directory
 -- About
 
 This program demonstrates how to extract all video frames from an MPEG-PS file. 
-Frames are saved as PNG via stb_image_write: https://github.com/nothings/stb
+Frames are saved as BMP.
 
 */
 
