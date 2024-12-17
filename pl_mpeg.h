@@ -1811,7 +1811,7 @@ int plm_demux_has_headers(plm_demux_t *self) {
 }
 
 int plm_demux_probe(plm_demux_t *self, size_t probesize) {
-	int previous_pos = plm_buffer_tell(self->buffer);
+	int previous_pos = static_cast<int>(plm_buffer_tell(self->buffer));
 
 	int video_stream = FALSE;
 	int audio_streams[4] = {FALSE, FALSE, FALSE, FALSE};
@@ -1878,7 +1878,7 @@ double plm_demux_get_start_time(plm_demux_t *self, int type) {
 		return self->start_time;
 	}
 
-	int previous_pos = plm_buffer_tell(self->buffer);
+	int previous_pos = static_cast<int>(plm_buffer_tell(self->buffer));
 	int previous_start_code = self->start_code;
 	
 	// Find first video PTS
