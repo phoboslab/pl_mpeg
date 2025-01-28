@@ -812,7 +812,9 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self);
 #endif
 
 #define PLM_UNUSED(expr) (void)(expr)
-
+#ifdef _MSC_VER
+	#pragma warning(disable:4996)
+#endif
 
 // -----------------------------------------------------------------------------
 // plm (high-level interface) implementation
