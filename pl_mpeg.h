@@ -144,7 +144,6 @@ See below for detailed the API documentation.
 #define PL_MPEG_H
 
 #include <stdint.h>
-#include <stdio.h>
 
 
 #ifdef __cplusplus
@@ -261,6 +260,7 @@ typedef size_t(*plm_buffer_tell_callback)(plm_buffer_t *self, void *user);
 // plm_* public API
 // High-Level API for loading/demuxing/decoding MPEG-PS data
 
+#ifndef PLM_NO_STDIO
 
 // Create a plmpeg instance with a filename. Returns NULL if the file could not
 // be opened.
@@ -272,6 +272,8 @@ plm_t *plm_create_with_filename(const char *filename);
 // let plmpeg call fclose() on the handle when plm_destroy() is called.
 
 plm_t *plm_create_with_file(FILE *fh, int close_when_done);
+
+#endif // PLM_NO_STDIO
 
 
 // Create a plmpeg instance with a pointer to memory as source. This assumes the
@@ -473,6 +475,7 @@ plm_frame_t *plm_seek_frame(plm_t *self, double time, int seek_exact);
 #define PLM_BUFFER_DEFAULT_SIZE (128 * 1024)
 #endif
 
+#ifndef PLM_NO_STDIO
 
 // Create a buffer instance with a filename. Returns NULL if the file could not
 // be opened.
@@ -484,6 +487,8 @@ plm_buffer_t *plm_buffer_create_with_filename(const char *filename);
 // to let plmpeg call fclose() on the handle when plm_destroy() is called.
 
 plm_buffer_t *plm_buffer_create_with_file(FILE *fh, int close_when_done);
+
+#endif // PLM_NO_STDIO
 
 
 // Create a buffer instance with custom callbacks for loading, seeking and
@@ -822,6 +827,9 @@ plm_samples_t *plm_audio_decode(plm_audio_t *self);
 
 #include <string.h>
 #include <stdlib.h>
+#ifndef PLM_NO_STDIO
+#include <stdio.h>
+#endif
 
 #ifndef TRUE
 #define TRUE 1
@@ -874,6 +882,8 @@ void plm_read_video_packet(plm_buffer_t *buffer, void *user);
 void plm_read_audio_packet(plm_buffer_t *buffer, void *user);
 void plm_read_packets(plm_t *self, int requested_type);
 
+#ifndef PLM_NO_STDIO
+
 plm_t *plm_create_with_filename(const char *filename) {
 	plm_buffer_t *buffer = plm_buffer_create_with_filename(filename);
 	if (!buffer) {
@@ -886,6 +896,8 @@ plm_t *plm_create_with_file(FILE *fh, int close_when_done) {
 	plm_buffer_t *buffer = plm_buffer_create_with_file(fh, close_when_done);
 	return plm_create_with_buffer(buffer, TRUE);
 }
+
+#endif // PLM_NO_STDIO
 
 plm_t *plm_create_with_memory(uint8_t *bytes, size_t length, int free_when_done) {
 	plm_buffer_t *buffer = plm_buffer_create_with_memory(bytes, length, free_when_done);
@@ -1377,8 +1389,10 @@ struct plm_buffer_t {
 	int discard_read_bytes;
 	int has_ended;
 	int free_when_done;
+#ifndef PLM_NO_STDIO
 	int close_when_done;
 	FILE *fh;
+#endif
 	plm_buffer_load_callback load_callback;
 	plm_buffer_seek_callback seek_callback;
 	plm_buffer_tell_callback tell_callback;
@@ -1401,9 +1415,12 @@ typedef struct {
 void plm_buffer_seek(plm_buffer_t *self, size_t pos);
 size_t plm_buffer_tell(plm_buffer_t *self);
 void plm_buffer_discard_read_bytes(plm_buffer_t *self);
+
+#ifndef PLM_NO_STDIO
 void plm_buffer_load_file_callback(plm_buffer_t *self, void *user);
 void plm_buffer_seek_file_callback(plm_buffer_t *self, size_t offset, void *user);
 size_t plm_buffer_tell_file_callback(plm_buffer_t *self, void *user);
+#endif
 
 int plm_buffer_has(plm_buffer_t *self, size_t count);
 int plm_buffer_read(plm_buffer_t *self, int count);
@@ -1415,6 +1432,8 @@ int plm_buffer_find_start_code(plm_buffer_t *self, int code);
 int plm_buffer_no_start_code(plm_buffer_t *self);
 int16_t plm_buffer_read_vlc(plm_buffer_t *self, const plm_vlc_t *table);
 uint16_t plm_buffer_read_vlc_uint(plm_buffer_t *self, const plm_vlc_uint_t *table);
+
+#ifndef PLM_NO_STDIO
 
 plm_buffer_t *plm_buffer_create_with_filename(const char *filename) {
 	FILE *fh = fopen(filename, "rb");
@@ -1440,6 +1459,8 @@ plm_buffer_t *plm_buffer_create_with_file(FILE *fh, int close_when_done) {
 	self->tell_callback = plm_buffer_tell_file_callback;
 	return self;
 }
+
+#endif // PLM_NO_STDIO
 
 plm_buffer_t *plm_buffer_create_with_callbacks(
 	plm_buffer_load_callback load_callback,
@@ -1490,9 +1511,11 @@ plm_buffer_t *plm_buffer_create_for_appending(size_t initial_capacity) {
 }
 
 void plm_buffer_destroy(plm_buffer_t *self) {
+#ifndef PLM_NO_STDIO
 	if (self->fh && self->close_when_done) {
 		fclose(self->fh);
 	}
+#endif
 	if (self->free_when_done) {
 		PLM_FREE(self->bytes);
 	}
@@ -1596,6 +1619,8 @@ void plm_buffer_discard_read_bytes(plm_buffer_t *self) {
 	}
 }
 
+#ifndef PLM_NO_STDIO
+
 void plm_buffer_load_file_callback(plm_buffer_t *self, void *user) {
 	PLM_UNUSED(user);
 	
@@ -1621,6 +1646,8 @@ size_t plm_buffer_tell_file_callback(plm_buffer_t *self, void *user) {
 	PLM_UNUSED(user);
 	return ftell(self->fh);
 }
+
+#endif // PLM_NO_STDIO
 
 int plm_buffer_has_ended(plm_buffer_t *self) {
 	return self->has_ended;
