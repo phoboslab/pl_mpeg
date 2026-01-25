@@ -3098,6 +3098,14 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->start_code = plm_buffer_next_start_code(self->buffer);
 	}
 
+	// Predict skipped macroblocks after the last slice
+	while (self->macroblock_address < self->mb_size - 1 ) {
+		self->macroblock_address++;
+		self->mb_row = self->macroblock_address / self->mb_width;
+		self->mb_col = self->macroblock_address % self->mb_width;
+		plm_video_predict_macroblock(self);
+	}
+
 	// If this is a reference picture rotate the prediction pointers
 	if (
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
